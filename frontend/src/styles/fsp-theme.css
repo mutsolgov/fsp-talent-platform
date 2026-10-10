@@ -1,0 +1,231 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   FSP DESIGN SYSTEM — TAILWIND CSS v4 @theme SPECIFICATION
+   File: src/styles/fsp-theme.css
+   Source: Official FSP Russia Brandbook (https://fsp-russia.ru/press/brandbook/)
+   ========================================================================== */
+
+/* ------------------------------------------------------------------------
+   Local Offline Fonts (Zero CDN / Offline Docker Safe)
+   ------------------------------------------------------------------------ */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2'),
+       url('/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2'),
+       url('/fonts/JetBrainsMono-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2'),
+       url('/fonts/JetBrainsMono-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* ------------------------------------------------------------------------
+     1A. Official FSP Russia Brandbook Primitives (fsp-russia.ru)
+     ------------------------------------------------------------------------ */
+  --color-fsp-blue: #402FFF;
+  --color-fsp-red: #EC1D35;
+  --color-fsp-graphite: #1B1C21;
+  --color-fsp-dark-surface: #2D2E37;
+  --color-fsp-dark-footer: #202129;
+  --color-fsp-dark-card: #1E1F26;
+  --color-fsp-dark-border: #3D3E42;
+  --color-fsp-light: #EDEDED;
+  --color-fsp-silver: #C8C9CA;
+  --color-fsp-muted: #9B9C9E;
+
+  /* ------------------------------------------------------------------------
+     1B. LCT 2026 Special Track Co-Branding Primitives
+     ------------------------------------------------------------------------ */
+  --color-fsp-purple-deep: #2A0845;
+  --color-fsp-magenta-vibrant: #4A154B;
+  --color-fsp-purple-electric: #7B2CBF;
+  --color-fsp-cyber-mint: #00F5D4;
+  --color-fsp-violet-accent: #9D4EDD;
+  --color-fsp-lavender-glow: #C77DFF;
+  --color-fsp-cyan-neon: #5CE1E6;
+  --color-fsp-gold-zms: #FFD700;
+
+  /* ------------------------------------------------------------------------
+     2. Official Typography Font Stacks (Brandbook: JetBrains Mono + Inter)
+     ------------------------------------------------------------------------ */
+  --font-display: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ------------------------------------------------------------------------
+     3. Official Radii & Container Max-Width (fsp-russia.ru custom.css)
+     ------------------------------------------------------------------------ */
+  --radius-fsp-control: 6px;
+  --radius-fsp-card: 12px;
+  --radius-fsp-feature: 20px;
+  --container-fsp: 1340px;
+
+  /* ------------------------------------------------------------------------
+     4. Responsive Breakpoints
+     ------------------------------------------------------------------------ */
+  --breakpoint-xs: 360px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ==========================================================================
+   SEMANTIC TOKENS: LIGHT & DARK MODE MAPPINGS (CSS Custom Properties)
+   ========================================================================== */
+
+:root {
+  /* LIGHT MODE */
+  --fsp-bg-canvas: #EDEDED;
+  --fsp-surface-1: #FFFFFF;
+  --fsp-surface-2: #F8F9FC;
+  --fsp-surface-3: #D9D9D9;
+  --fsp-surface-brand: #402FFF;
+  --fsp-surface-lct: #2A0845;
+
+  --fsp-border-subtle: #D9D9D9;
+  --fsp-border-default: #C8C9CA;
+  --fsp-border-brand: #402FFF;
+  --fsp-border-focus: #402FFF;
+
+  --fsp-text-primary: #1B1C21;
+  --fsp-text-secondary: #334155;
+  --fsp-text-muted: #5F5F66;
+  --fsp-text-inverse: #FFFFFF;
+  --fsp-text-brand: #402FFF;
+
+  /* Status Tokens */
+  --fsp-status-success-text: #065F46;
+  --fsp-status-success-bg: #ECFDF5;
+  --fsp-status-success-border: #A7F3D0;
+
+  --fsp-status-warning-text: #92400E;
+  --fsp-status-warning-bg: #FFFBEB;
+  --fsp-status-warning-border: #FDE68A;
+
+  --fsp-status-danger-text: #991B1B;
+  --fsp-status-danger-bg: #FEF2F2;
+  --fsp-status-danger-border: #FECACA;
+
+  --fsp-status-info-text: #075985;
+  --fsp-status-info-bg: #F0F9FF;
+  --fsp-status-info-border: #BAE6FD;
+
+  /* Shadows & Glows */
+  --fsp-shadow-card: 0 1px 3px 0 rgba(27, 28, 33, 0.08), 0 1px 2px -1px rgba(27, 28, 33, 0.04);
+  --fsp-shadow-elevated: 0 10px 15px -3px rgba(27, 28, 33, 0.10), 0 4px 6px -4px rgba(27, 28, 33, 0.05);
+  --fsp-glow-brand: 0 0 16px rgba(64, 47, 255, 0.20);
+  --fsp-glow-mint: 0 0 16px rgba(0, 245, 212, 0.25);
+}
+
+.dark {
+  /* DARK MODE */
+  --fsp-bg-canvas: #1B1C21;
+  --fsp-surface-1: #202129;
+  --fsp-surface-2: #2D2E37;
+  --fsp-surface-3: #3D3E42;
+  --fsp-surface-brand: #402FFF;
+  --fsp-surface-lct: #2A0845;
+  --fsp-header-floating: rgba(255, 255, 255, 0.90);
+
+  --fsp-border-subtle: #2D2E37;
+  --fsp-border-default: #3D3E42;
+  --fsp-border-brand: #402FFF;
+  --fsp-border-focus: #00F5D4;
+
+  --fsp-text-primary: #EDEDED;
+  --fsp-text-secondary: #C8C9CA;
+  --fsp-text-muted: #9B9C9E;
+  --fsp-text-inverse: #1B1C21;
+  --fsp-text-brand: #402FFF;
+
+  /* Status Tokens */
+  --fsp-status-success-text: #00F5D4;
+  --fsp-status-success-bg: rgba(0, 245, 212, 0.10);
+  --fsp-status-success-border: rgba(0, 245, 212, 0.35);
+
+  --fsp-status-warning-text: #FBBF24;
+  --fsp-status-warning-bg: rgba(251, 191, 36, 0.10);
+  --fsp-status-warning-border: rgba(251, 191, 36, 0.35);
+
+  --fsp-status-danger-text: #FB7185;
+  --fsp-status-danger-bg: rgba(236, 29, 53, 0.15);
+  --fsp-status-danger-border: #EC1D35;
+
+  --fsp-status-info-text: #38BDF8;
+  --fsp-status-info-bg: rgba(64, 47, 255, 0.20);
+  --fsp-status-info-border: #402FFF;
+
+  /* Shadows & Glows */
+  --fsp-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(61, 62, 66, 0.6);
+  --fsp-shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --fsp-glow-brand: 0 0 24px rgba(64, 47, 255, 0.45);
+  --fsp-glow-icon: linear-gradient(180deg, rgb(237, 237, 237) 11.931%, rgb(64, 47, 255) 77.4%);
+  --fsp-glow-mint: 0 0 20px rgba(0, 245, 212, 0.40);
+  --fsp-glow-magenta: 0 0 24px rgba(74, 21, 75, 0.50);
+}
+
+/* Global Reset & Base */
+*, ::before, ::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  background-color: var(--fsp-bg-canvas);
+  color: var(--fsp-text-primary);
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------------
+   Micro-animations & Utility Classes
+   ------------------------------------------------------------------------ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-in {
+  animation-duration: 0.15s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.zoom-in-95 {
+  transform: scale(0.95);
+  animation-name: zoomIn;
+}
+
