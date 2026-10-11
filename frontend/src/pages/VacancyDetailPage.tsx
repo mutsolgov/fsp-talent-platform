@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { PublicLayout } from '../components/templates/PublicLayout';
+import { CandidateLayout } from '../components/templates/CandidateLayout';
+import { EmployerLayout } from '../components/templates/EmployerLayout';
+import { useAuthStore } from '../stores/useAuthStore';
 import { Badge } from '../components/atoms/Badge';
 import { Button } from '../components/atoms/Button';
 import { Building, ShieldCheck, CheckCircle, ArrowRight, Check, AlertCircle } from '../components/icons';
 import { api } from '../api/client';
 
 export const VacancyDetailPage: React.FC = () => {
+  const { role } = useAuthStore();
   const [vacancyId, setVacancyId] = useState<number>(() => {
     const parts = window.location.pathname.split('/').filter(Boolean);
     const last = parts[parts.length - 1];
@@ -29,37 +33,54 @@ export const VacancyDetailPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await api.get<any>(`/vacancies/${resolvedId}`);
-        setVacancy({
-          id: data.id ?? resolvedId,
-          title: data.title ?? 'Вакансия',
-          companyName: data.employer_company_name ?? 'Работодатель',
-          inn: data.inn ?? '7707083893',
-          specialization: data.specialization ?? 'backend',
-          grade: data.grade ?? 'senior',
-          salaryMinRub: data.salary_min ?? 0,
-          salaryMaxRub: data.salary_max ?? 0,
-          location: `${data.city ?? 'Москва'} (${data.work_format ?? 'Гибрид'})`,
-          isTrustEmployer: true,
-          tags: data.required_skills ?? [],
-          description: data.description ?? 'Описание инженерных задач и архитектуры проекта.',
-          responsibilities: [
-            'Проектирование и разработка масштабируемых сервисов платформы',
-            'Оптимизация производительности и профилирование критических путей',
-            'Code Review и участие в архитектурных комитетах команды',
-          ],
-          requirements: Array.isArray(data.required_skills) && data.required_skills.length > 0
-            ? data.required_skills.map((s: string) => `Уверенное практическое владение ${s}`)
-            : [
-                'Опыт коммерческой разработки от 3 лет',
-                'Понимание принципов построения надежных распределенных систем',
-              ],
-          benefits: [
-            'Белая заработная плата с фиксацией в рублях и прозрачная система грейдов',
-            'ДМС со стоматологией с первого рабочего дня',
-            'Поддержка участия в турнирах ФСП России и спортивном программировании',
-          ],
-        });
+        const [vRes, aRes] = await Promise.allSettled([
+          api.get<any>(`/vacancies/${resolvedId}`),
+          role === 'candidate' ? api.get<any>('/applications/sent') : Promise.resolve(null),
+        ]);
+
+        if (vRes.status === 'fulfilled') {
+          const data = vRes.value;
+          setVacancy({
+            id: data.id ?? resolvedId,
+            title: data.title ?? 'Вакансия',
+            companyName: data.employer_company_name ?? 'Работодатель',
+            inn: data.inn ?? '7707083893',
+            specialization: data.specialization ?? 'backend',
+            grade: data.grade ?? 'senior',
+            salaryMinRub: data.salary_min ?? 0,
+            salaryMaxRub: data.salary_max ?? 0,
+            location: `${data.city ?? 'Москва'} (${data.work_format ?? 'Гибрид'})`,
+            isTrustEmployer: true,
+            tags: data.required_skills ?? [],
+            description: data.description ?? 'Описание инженерных задач и архитектуры проекта.',
+            responsibilities: [
+              'Проектирование и разработка масштабируемых сервисов платформы',
+              'Оптимизация производительности и профилирование критических путей',
+              'Code Review и участие в архитектурных комитетах команды',
+            ],
+            requirements: Array.isArray(data.required_skills) && data.required_skills.length > 0
+              ? data.required_skills.map((s: string) => `Уверенное практическое владение ${s}`)
+              : [
+                  'Опыт коммерческой разработки от 3 лет',
+                  'Понимание принципов построения надежных распределенных систем',
+                ],
+            benefits: [
+              'Белая заработная плата с фиксацией в рублях и прозрачная система грейдов',
+              'ДМС со стоматологией с первого рабочего дня',
+              'Поддержка участия в турнирах ФСП России и спортивном программировании',
+            ],
+          });
+        } else {
+          setError('Вакансия не найдена на сервере');
+        }
+
+        if (aRes.status === 'fulfilled' && aRes.value) {
+          const list = Array.isArray(aRes.value) ? aRes.value : aRes.value?.items || [];
+          const isAlreadyApplied = list.some((a: any) => (a.vacancy_id ?? a.vacancyId) === resolvedId);
+          if (isAlreadyApplied) {
+            setApplied(true);
+          }
+        }
       } catch (err: any) {
         setError(err?.message || 'Вакансия не найдена на сервере');
       } finally {
@@ -67,7 +88,7 @@ export const VacancyDetailPage: React.FC = () => {
       }
     };
     loadVacancy();
-  }, []);
+  }, [role]);
 
   const handleApply = async () => {
     setApplyError(null);
@@ -79,14 +100,16 @@ export const VacancyDetailPage: React.FC = () => {
     }
   };
 
-  return (
-    <PublicLayout>
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center gap-2 text-xs font-mono text-[#9B9C9E]">
-          <a href="/vacancies" className="hover:text-white">← Каталог вакансий</a>
-          <span>/</span>
-          <span className="text-white font-bold">{vacancy?.title || `Вакансия #${vacancyId}`}</span>
-        </div>
+  const backHref = role === 'candidate' ? '/candidate/applications' : role === 'employer' ? '/employer/vacancies' : '/vacancies';
+  const backLabel = role === 'candidate' ? '← Назад к откликам и вакансиям' : role === 'employer' ? '← Назад к вакансиям компании' : '← Каталог вакансий';
+
+  const content = (
+    <div className="max-w-4xl mx-auto flex flex-col gap-6">
+      <div className="flex items-center gap-2 text-xs font-mono text-[#9B9C9E]">
+        <a href={backHref} className="hover:text-white transition-colors">{backLabel}</a>
+        <span>/</span>
+        <span className="text-white font-bold">{vacancy?.title || `Вакансия #${vacancyId}`}</span>
+      </div>
 
         {error && (
           <div className="p-4 bg-rose-950/40 border border-rose-500/40 text-[#FB7185] rounded-[12px] text-xs font-mono flex items-center gap-2">
@@ -155,6 +178,21 @@ export const VacancyDetailPage: React.FC = () => {
                 <CheckCircle size={18} />
                 <span>Ваш отклик успешно отправлен! Работодатель получил ваш верифицированный KITE-профиль.</span>
               </div>
+            ) : role === 'public' ? (
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="fsp_mint"
+                  size="lg"
+                  onClick={() => { window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`; }}
+                >
+                  <span>Войти для прямого отклика</span>
+                  <ArrowRight size={16} />
+                </Button>
+              </div>
+            ) : role === 'employer' ? (
+              <div className="p-3 bg-[#402FFF]/10 border border-[#402FFF]/30 text-white rounded-[8px] text-xs font-mono">
+                Режим работодателя: просмотр опубликованных условий вакансии.
+              </div>
             ) : (
               <div className="flex items-center gap-4">
                 <Button variant="fsp_mint" size="lg" onClick={handleApply}>
@@ -211,7 +249,14 @@ export const VacancyDetailPage: React.FC = () => {
           </div>
         )}
       </div>
-    </PublicLayout>
   );
+
+  if (role === 'candidate') {
+    return <CandidateLayout currentTab="applications">{content}</CandidateLayout>;
+  }
+  if (role === 'employer') {
+    return <EmployerLayout currentTab="vacancies">{content}</EmployerLayout>;
+  }
+  return <PublicLayout>{content}</PublicLayout>;
 };
 export default VacancyDetailPage;

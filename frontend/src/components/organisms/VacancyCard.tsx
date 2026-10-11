@@ -7,6 +7,7 @@ import { Building, ShieldCheck, ArrowRight, CheckCircle } from '../icons';
 export interface VacancyCardProps {
   vacancy: VacancySummary;
   onApplyClick?: () => void;
+  onCardClick?: () => void;
   isApplied?: boolean;
   isPublic?: boolean;
   className?: string;
@@ -15,20 +16,47 @@ export interface VacancyCardProps {
 export const VacancyCard: React.FC<VacancyCardProps> = ({
   vacancy,
   onApplyClick,
+  onCardClick,
   isApplied = false,
   isPublic = false,
   className = '',
 }) => {
+  const detailUrl = `/vacancies/${vacancy.id}`;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    if (onCardClick) {
+      onCardClick();
+    } else {
+      window.location.href = detailUrl;
+    }
+  };
+
   return (
     <article
-      className={`p-5 rounded-[12px] bg-[#202129] border border-[#3D3E42] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between gap-4 transition-all hover:border-[#402FFF]/60 ${className}`}
+      onClick={handleCardClick}
+      className={`p-5 rounded-[12px] bg-[#202129] border border-[#3D3E42] shadow-[0_4px_20px_rgba(0,0,0,0.4)] flex flex-col justify-between gap-4 transition-all hover:border-[#402FFF]/60 cursor-pointer ${className}`}
     >
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col">
-            <h3 className="font-mono text-base font-bold text-white hover:text-[#00F5D4] transition-colors cursor-pointer">
-              {vacancy.title}
-            </h3>
+            <a
+              href={detailUrl}
+              onClick={(e) => {
+                if (onCardClick) {
+                  e.preventDefault();
+                  onCardClick();
+                }
+              }}
+              className="group"
+            >
+              <h3 className="font-mono text-base font-bold text-white group-hover:text-[#00F5D4] transition-colors cursor-pointer">
+                {vacancy.title}
+              </h3>
+            </a>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-mono text-[#EDEDED] flex items-center gap-1">
                 <Building size={14} className="text-[#402FFF]" />
@@ -90,7 +118,10 @@ export const VacancyCard: React.FC<VacancyCardProps> = ({
         ) : onApplyClick ? (
           <button
             type="button"
-            onClick={onApplyClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              onApplyClick();
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#402FFF] hover:bg-[#3525E0] text-white text-xs font-mono font-medium transition-colors cursor-pointer shadow-[0_0_12px_rgba(64,47,255,0.3)]"
           >
             <span>Откликнуться</span>

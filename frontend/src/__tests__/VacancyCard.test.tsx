@@ -53,4 +53,17 @@ describe('VacancyCard Organism & Applied Status Layout', () => {
     // Elements are positioned cleanly in flex layout, not absolute top-4 right-4
     expect(html).not.toContain('absolute top-4 right-4');
   });
+
+  it('renders drill-down link with href to /vacancies/:id for vacancy details', () => {
+    const html = renderToString(
+      React.createElement(VacancyCard, {
+        vacancy: mockVacancy,
+        onApplyClick: () => {},
+        isApplied: false,
+      })
+    );
+
+    expect(html).toContain('href="/vacancies/10"');
+    expect(html).toContain('Senior Python Engineer');
+  });
 });

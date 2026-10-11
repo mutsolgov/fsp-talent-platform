@@ -151,13 +151,14 @@ export const CandidateVacanciesPage: React.FC = () => {
                 .map((vacancy) => (
                   <div
                     key={vacancy.id}
-                    className="p-5 bg-[#202129] rounded-[12px] border border-[#2D2E37] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                    onClick={() => { window.location.href = `/vacancies/${vacancy.id}`; }}
+                    className="p-5 bg-[#202129] rounded-[12px] border border-[#2D2E37] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:border-[#402FFF]/60 transition-all group"
                   >
                     <div>
                       <span className="text-xs font-mono text-[#00F5D4] font-bold">
                         {vacancy.companyName}
                       </span>
-                      <h3 className="font-mono text-base font-bold text-white mt-0.5">
+                      <h3 className="font-mono text-base font-bold text-white mt-0.5 group-hover:text-[#00F5D4] transition-colors">
                         {vacancy.title}
                       </h3>
                       <div className="flex items-center gap-3 text-xs text-[#9B9C9E] mt-1.5 font-mono">
