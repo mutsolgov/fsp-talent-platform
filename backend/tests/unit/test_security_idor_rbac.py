@@ -273,3 +273,34 @@ def test_micro_challenge_rbac_and_ownership():
         await engine.dispose()
 
     asyncio.run(_run())
+
+
+def test_verify_corporate_domain_prefix_safety():
+    from app.services.antifraud_service import verify_corporate_domain
+    # Domains that previously failed or were corrupted by lstrip (Defect N3)
+    assert verify_corporate_domain("https://sberbank.ru")[0] is True
+    assert verify_corporate_domain("http://tinkoff.ru")[0] is True
+    assert verify_corporate_domain("https://hh.ru")[0] is True
+    assert verify_corporate_domain("test.company.com")[0] is True
+
+
+def test_ast_sandbox_validator():
+    from app.api.v1.assessment import validate_solution_ast
+
+    # Dangerous snippets must raise 400 (Defect N4)
+    with pytest.raises(HTTPException) as exc:
+        validate_solution_ast("def solution(): return ().__class__.__bases__[0].__subclasses__()")
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        validate_solution_ast("def solution(): return eval('1 + 1')")
+    assert exc.value.status_code == 400
+
+    with pytest.raises(HTTPException) as exc:
+        validate_solution_ast("import os\ndef solution(): return 1")
+    assert exc.value.status_code == 400
+
+    # Legitimate algorithms must pass without exception
+    validate_solution_ast("def solution(records):\n    return max(records) if records else 0")
+    validate_solution_ast("def solution():\n    total = 0\n    for i in range(10):\n        total += i\n    return total")
+

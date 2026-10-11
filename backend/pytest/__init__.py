@@ -62,6 +62,31 @@ def raises(expected_exc: Any, match: Optional[str] = None) -> _RaisesContext:
     return _RaisesContext(expected_exc, match=match)
 
 
+class ApproxValue:
+    def __init__(self, expected: Any, rel: Optional[float] = None, abs: Optional[float] = None, nan_ok: bool = False):
+        self.expected = expected
+        self.rel = rel
+        self.abs = abs
+        self.nan_ok = nan_ok
+
+    def __eq__(self, actual: Any) -> bool:
+        if self.abs is not None:
+            return builtin_abs(actual - self.expected) <= self.abs
+        if self.rel is not None:
+            return builtin_abs(actual - self.expected) <= builtin_abs(self.expected) * self.rel
+        return builtin_abs(actual - self.expected) <= 1e-6
+
+    def __repr__(self) -> str:
+        return f"approx({self.expected})"
+
+
+builtin_abs = abs
+
+
+def approx(expected: Any, rel: Optional[float] = None, abs: Optional[float] = None, nan_ok: bool = False) -> ApproxValue:
+    return ApproxValue(expected, rel=rel, abs=abs, nan_ok=nan_ok)
+
+
 _FIXTURES: dict[str, Callable[..., Any]] = {}
 
 
@@ -187,6 +212,20 @@ def main(args: Optional[list[str]] = None) -> int:
             for attr_name in dir(mod)
             if attr_name.startswith("test_") and callable(getattr(mod, attr_name))
         ]
+        # Find test classes (starting with Test)
+        for attr_name in dir(mod):
+            if attr_name.startswith("Test"):
+                cls_obj = getattr(mod, attr_name)
+                if isinstance(cls_obj, type):
+                    try:
+                        instance = cls_obj()
+                        for m_name in dir(cls_obj):
+                            if m_name.startswith("test_"):
+                                method = getattr(instance, m_name)
+                                if callable(method):
+                                    test_funcs.append((f"{attr_name}.{m_name}", method))
+                    except Exception as cls_e:
+                        print(f"\n[WARN] Failed to instantiate {attr_name}: {cls_e}")
 
         file_passed = 0
         file_failed = 0

@@ -70,7 +70,7 @@ class IsomorphicGenerator:
             rendered_prompt = rendered_prompt.replace(f"{{{{{k}}}}}", str(v))
 
         # 3. Детерминированная генерация 3 публичных тестов
-        window_size = int(selected_params.get("window_size", 5))
+        window_size = max(1, int(selected_params.get("window_size", 5)))
         threshold = int(selected_params.get("threshold", 100))
         service_name = str(selected_params.get("service_name", "OrderRouter"))
 
@@ -78,7 +78,7 @@ class IsomorphicGenerator:
         for i in range(3):
             sample_len = window_size + rng.randint(2, 6)
             sample_records = [rng.randint(10, 500) for _ in range(sample_len)]
-            expected_val = max(sample_records[:window_size])
+            expected_val = max(sample_records[:window_size]) if sample_records[:window_size] else 0
             public_tests.append({
                 "test_id": f"pub_{i+1}",
                 "input": {
@@ -105,7 +105,7 @@ class IsomorphicGenerator:
                 is_stress = True
 
             hidden_records = [rng.randint(-500, 10000) for _ in range(n_elements)]
-            expected_val = max(hidden_records[:window_size]) if hidden_records else 0
+            expected_val = max(hidden_records[:window_size]) if hidden_records[:window_size] else 0
 
             hidden_tests.append({
                 "test_id": f"hid_{i+1}",

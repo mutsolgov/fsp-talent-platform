@@ -12,8 +12,15 @@ from sqlalchemy.orm import selectinload
 from app.models.saved_shortlists import SavedShortlist
 from app.models.shortlist_items import ShortlistItem
 from app.models.candidate_profiles import CandidateProfile
+from app.models.candidate_skills import CandidateSkill
+from app.models.candidate_categorizations import CandidateCategorization
+from app.models.categories import Category
 from app.models.employer_needs import EmployerNeed
-from app.services.ranking_engine import calculate_candidate_score, aggregate_candidate_fsp_data
+from app.services.ranking_engine import (
+    calculate_candidate_score,
+    aggregate_candidate_fsp_data,
+    GRADE_RANK_MAP,
+)
 from app.services.explainability_service import build_explainability
 
 
@@ -112,9 +119,22 @@ async def refine_shortlist_items(
     stmt = (
         select(ShortlistItem)
         .options(
-            selectinload(ShortlistItem.candidate_profile).selectinload(CandidateProfile.candidate_skills),
-            selectinload(ShortlistItem.candidate_profile).selectinload(CandidateProfile.candidate_categorizations),
-            selectinload(ShortlistItem.candidate_profile).selectinload(CandidateProfile.fsp_achievements),
+            selectinload(ShortlistItem.candidate_profile)
+                .selectinload(CandidateProfile.candidate_skills)
+                .selectinload(CandidateSkill.skill),
+            selectinload(ShortlistItem.candidate_profile)
+                .selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.category)
+                .selectinload(Category.specialization),
+            selectinload(ShortlistItem.candidate_profile)
+                .selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.category)
+                .selectinload(Category.grade),
+            selectinload(ShortlistItem.candidate_profile)
+                .selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.confirmed_grade),
+            selectinload(ShortlistItem.candidate_profile)
+                .selectinload(CandidateProfile.fsp_achievements),
         )
         .where(ShortlistItem.shortlist_id == shortlist.id)
     )
@@ -126,10 +146,11 @@ async def refine_shortlist_items(
 
     for item in items:
         cand = item.candidate_profile
-        # Extract candidate specialization and grade from latest categorization or defaults
-        cand_spec = spec_code
-        cand_grade_rank = need_grade_rank
-        theta = 80.0
+        # Extract candidate actual specialization and grade from latest categorization or profile survey
+        cand_spec = "unknown"
+        cand_grade_str = "middle"
+        cand_grade_rank = 2
+        theta = 50.0
 
         if cand.candidate_categorizations:
             curr_cat = next(
@@ -137,8 +158,26 @@ async def refine_shortlist_items(
                 cand.candidate_categorizations[0],
             )
             theta = curr_cat.test_score
+            if curr_cat.category:
+                if curr_cat.category.specialization:
+                    cand_spec = curr_cat.category.specialization.code
+                elif getattr(curr_cat.category, "slug", None):
+                    cand_spec = curr_cat.category.slug.split("-")[0]
+                if curr_cat.category.grade:
+                    cand_grade_str = curr_cat.category.grade.code
+                    cand_grade_rank = curr_cat.category.grade.rank_order
             if hasattr(curr_cat, "confirmed_grade") and curr_cat.confirmed_grade:
                 cand_grade_rank = curr_cat.confirmed_grade.rank_order
+                cand_grade_str = curr_cat.confirmed_grade.code
+        elif cand.survey_data_json and isinstance(cand.survey_data_json, dict):
+            if cand.survey_data_json.get("specialization_code"):
+                cand_spec = cand.survey_data_json["specialization_code"]
+            if cand.survey_data_json.get("claimed_grade_code"):
+                cand_grade_str = cand.survey_data_json["claimed_grade_code"]
+                cand_grade_rank = GRADE_RANK_MAP.get(str(cand_grade_str).lower(), 2)
+
+        if cand_spec == "unknown" and hasattr(cand, "specialization") and cand.specialization:
+            cand_spec = cand.specialization.code if hasattr(cand.specialization, "code") else str(cand.specialization)
 
         cand_skills = [
             cs.skill.name if hasattr(cs, "skill") and cs.skill else "python"
@@ -167,7 +206,7 @@ async def refine_shortlist_items(
 
         expl = build_explainability(
             cand_spec=cand_spec,
-            cand_grade="middle",
+            cand_grade=cand_grade_str,
             overall_score=new_score,
             test_subscore=calc["test_subscore"],
             stack_subscore=calc["stack_subscore"],

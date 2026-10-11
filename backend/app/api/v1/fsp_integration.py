@@ -461,6 +461,14 @@ async def get_fsp_profile(
         profile = res.scalar_one_or_none()
         if not profile:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Профиль соискателя не найден")
+
+        is_owner = (current_user.id == profile.user_id)
+        is_authorized = is_owner or (current_user.role in ("admin", "jury", "employer"))
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к чужому досье соискателя",
+            )
     else:
         profile = await get_candidate_profile(current_user=current_user, db=db)
 

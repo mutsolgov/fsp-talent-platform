@@ -149,14 +149,12 @@ def exchange_authorization_code(
     """
     auth_data = _AUTH_CODES.get(code)
     if not auth_data:
-        # Fallback for standard test codes like "valid_test_code"
-        # Map to default mock athlete FSP-77-01042
-        fsp_id = "FSP-77-01042"
-    else:
-        # Verify PKCE
-        if not verify_pkce(code_verifier, auth_data["code_challenge"]):
-            raise ValueError("ERR_INVALID_PKCE_VERIFIER: Code verifier does not match challenge")
-        fsp_id = auth_data["fsp_id"]
+        raise ValueError("ERR_INVALID_AUTH_CODE: Авторизационный код не найден или истек")
+
+    # Verify PKCE
+    if not verify_pkce(code_verifier, auth_data["code_challenge"]):
+        raise ValueError("ERR_INVALID_PKCE_VERIFIER: Code verifier does not match challenge")
+    fsp_id = auth_data["fsp_id"]
 
     athlete = MOCK_FSP_ATHLETES.get(fsp_id)
     if not athlete:

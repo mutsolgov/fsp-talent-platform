@@ -504,20 +504,23 @@ async def verify_email(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> StatusMessageResponse:
-    # Декодирование токена верификации email (или fallback для демо токена)
+    # Строгое криптографическое декодирование токена верификации email
     try:
         data = decode_token(payload.token)
-        user_id = int(data.get("sub", 0))
+        user_id_str = data.get("sub")
+        if not user_id_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Недействительный токен подтверждения",
+            )
+        user_id = int(user_id_str)
+    except HTTPException:
+        raise
     except Exception:
-        # Для прямых токенов с префиксом email_verify_
-        if payload.token.startswith("email_verify_"):
-            parts = payload.token.split("_")
-            try:
-                user_id = int(parts[-1])
-            except ValueError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недействительный токен подтверждения")
-        else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недействительный токен подтверждения")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недействительный токен подтверждения",
+        )
 
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()

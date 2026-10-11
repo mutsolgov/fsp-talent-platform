@@ -5,6 +5,7 @@ Defined in docs/04_OPENAPI_CONTRACTS_AND_SECURITY.md §2.5 and DISPATCH.md.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import ast
 import hashlib
 import inspect
 import math
@@ -51,6 +52,76 @@ from app.services.kite_irt import BayesianEAPEstimator, IRT3PLItem
 router = APIRouter(prefix="/assessment", tags=["assessment"])
 iso_generator = IsomorphicGenerator()
 _session_index_base: Dict[int, int] = {}
+
+FORBIDDEN_DUNDER_ATTRS = {
+    "__class__",
+    "__subclasses__",
+    "__bases__",
+    "__mro__",
+    "__globals__",
+    "__code__",
+    "__builtins__",
+    "__import__",
+    "__reduce__",
+    "__reduce_ex__",
+}
+
+FORBIDDEN_BUILTIN_CALLS = {
+    "eval",
+    "exec",
+    "open",
+    "__import__",
+    "compile",
+    "getattr",
+    "setattr",
+    "delattr",
+    "breakpoint",
+}
+
+
+def validate_solution_ast(code: str) -> None:
+    """
+    AST sandbox validator before exec() (Defect N4).
+    Prohibits dunder attribute access, dangerous builtins, and external imports.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        # Let runtime exec() catch syntax errors cleanly as wrong_answer
+        return
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            if node.attr in FORBIDDEN_DUNDER_ATTRS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Песочница: обращение к системному атрибуту '{node.attr}' запрещено (Sandbox Security Violation)",
+                )
+
+        if isinstance(node, ast.Name):
+            if node.id in FORBIDDEN_BUILTIN_CALLS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Песочница: использование функции '{node.id}' запрещено (Sandbox Security Violation)",
+                )
+
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_BUILTIN_CALLS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Песочница: вызов функции '{node.func.id}' запрещен (Sandbox Security Violation)",
+                )
+            if isinstance(node.func, ast.Attribute) and node.func.attr in FORBIDDEN_DUNDER_ATTRS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Песочница: вызов метода '{node.func.attr}' запрещен (Sandbox Security Violation)",
+                )
+
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Песочница: импорт внешних модулей в решении запрещен (Sandbox Security Violation)",
+            )
 
 
 def resolve_task_item_index(
@@ -478,6 +549,7 @@ async def submit_task_answer(
             is_correct = False
     else:
         if submitted_code and submitted_code.strip():
+            validate_solution_ast(submitted_code)
             try:
                 scope: Dict[str, Any] = {}
                 safe_builtins = {
@@ -844,10 +916,30 @@ async def jury_reset_cooldown(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    profile = await get_or_create_candidate_profile(current_user.id, db)
+    if current_user.role not in ("admin", "jury"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Сброс кулдауна доступен только администраторам и членам жюри",
+        )
+
+    target_profile_id = None
     reason = "jury_demonstration_test"
     if payload and isinstance(payload, dict):
+        target_profile_id = payload.get("candidate_id") or payload.get("candidate_profile_id")
         reason = payload.get("reason", reason)
+
+    if target_profile_id is not None:
+        p_res = await db.execute(
+            select(CandidateProfile).where(CandidateProfile.id == target_profile_id)
+        )
+        profile = p_res.scalar_one_or_none()
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Профиль соискателя не найден",
+            )
+    else:
+        profile = await get_or_create_candidate_profile(current_user.id, db)
 
     now = datetime.now(timezone.utc)
     reset_log = CooldownReset(

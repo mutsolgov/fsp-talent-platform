@@ -45,7 +45,7 @@ def test_eval_theta_standard_confirmation_70_to_88():
     assert res["confirmed_grade"] == "Middle"
     assert res["boost_offered"] is False
     assert res["retest_lower_offered"] is False
-    assert GradingEngine.COOLDOWN_DAYS == 30
+    assert GradingEngine.COOLDOWN_DAYS == 90
     expected_cooldown = now + timedelta(days=GradingEngine.COOLDOWN_DAYS)
     assert res["cooldown_until"] == expected_cooldown
 
@@ -116,6 +116,7 @@ def test_eval_boost_failure_preserves_base_grade():
     assert res["is_grade_confirmed"] is True
     assert res["boost_passed"] is False
     assert res["confirmed_grade"] == "Middle", "Базовый грейд Middle должен быть сохранен при неудаче буста на Senior"
+    assert res["cooldown_until"] is None, "Провал буст-теста не должен накладывать кулдаун (risk-free)"
 
 
 def test_cooldown_blocks_same_or_higher_grade():

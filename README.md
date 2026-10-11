@@ -1,5 +1,9 @@
 # Цифровая платформа-агрегатор ИТ-вакансий с верифицированным профилем достижений ФСП (ЛЦТ 2026)
 
+> **Команда:** «Ezdel»  
+> **Репозиторий проекта:** [https://github.com/mutsolgov/fsp-talent-platform](https://github.com/mutsolgov/fsp-talent-platform)  
+> **Боевой сервер (Live Production):** [http://153.76.194.215](http://153.76.194.215)  
+
 Промышленная цифровая платформа обратного рекрутинга (модель LHH) с объективной верификацией квалификации ИТ-специалистов через калиброванную адаптивную тестовую батарею KITE IRT 3PL, генератор изоморфных заданий на базе HMAC-SHA256, сквозную защиту персональных данных по 152-ФЗ РФ и интеграцию с реестром Федерации спортивного программирования (ФСП).
 
 ---
@@ -126,7 +130,7 @@
 ### 3.2. Пошаговые команды развертывания
 ```bash
 # 1. Клонирование репозитория на боевой сервер
-git clone <repo_url> /opt/fsp-talent-platform
+git clone https://github.com/mutsolgov/fsp-talent-platform.git /opt/fsp-talent-platform
 cd /opt/fsp-talent-platform
 
 # 2. Настройка портов брандмауэра UFW
@@ -155,8 +159,22 @@ docker compose exec backend python scripts/seed_demo_dataset.py
 
 ### 4.1. В Docker Compose:
 ```bash
+# 1. Сборка и фоновый запуск контейнеров
 docker compose up --build -d
+
+# 2. Инициализация эталонного датасета жюри (60 кандидатов, 15 потребностей)
 docker compose exec backend python scripts/seed_demo_dataset.py
+```
+
+После старта контейнеров локально платформа доступна по адресам:
+- **Frontend SPA (интерфейс платформы):** [http://localhost](http://localhost) (порт 80)
+- **Backend Swagger UI (документация API):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **OIDC Сервер Keycloak 26:** [http://localhost:8080/auth/](http://localhost:8080/auth/)
+- **Телеметрия и операционные метрики:** [http://localhost:8000/api/v1/demo/metrics](http://localhost:8000/api/v1/demo/metrics)
+
+Остановка контейнеров:
+```bash
+docker compose down
 ```
 
 ### 4.2. Ручной локальный запуск:

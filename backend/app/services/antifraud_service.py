@@ -94,7 +94,7 @@ def verify_corporate_domain(email_or_domain: str, check_dns: bool = False) -> Tu
         domain = domain.split("@")[-1]
 
     # Clean domain
-    domain = domain.lstrip("http://").lstrip("https://").split("/")[0]
+    domain = domain.removeprefix("https://").removeprefix("http://").split("/")[0]
 
     if not re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", domain):
         return False, "Некорректный формат доменного имени"

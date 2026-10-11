@@ -19,7 +19,9 @@ from app.database import get_db
 from app.models.applications import Application
 from app.models.assessment_sessions import AssessmentSession
 from app.models.candidate_profiles import CandidateProfile
+from app.models.candidate_categorizations import CandidateCategorization
 from app.models.candidate_skills import CandidateSkill
+from app.models.categories import Category
 from app.models.cooldown_resets import CooldownReset
 from app.models.employer_needs import EmployerNeed
 from app.models.employer_profiles import EmployerProfile
@@ -58,6 +60,11 @@ async def switch_demo_role(
     payload: DemoSwitchRoleRequest,
     db: AsyncSession = Depends(get_db),
 ) -> DemoSwitchRoleResponse:
+    if not settings.DEMO_BYPASS_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Демо-режим переключения ролей отключен",
+        )
     role_meta = {
         DemoRoleEnum.CANDIDATE_WITH_FSP: {
             "email": "mikhail.popov@fsp-russia.ru",
@@ -111,7 +118,7 @@ async def switch_demo_role(
     if not user:
         user = User(
             email=email,
-            hashed_password=get_password_hash("fsp_demo_secret_2026"),
+            hashed_password=get_password_hash("fsp_secret_2026"),
             role=info["role"].value,
             is_active=True,
             email_verified=True,
@@ -253,6 +260,14 @@ async def seed_demo_dataset(
     grade_rows = (await db.execute(select(Grade))).scalars().all()
     grade_map = {g.code: g.id for g in grade_rows}
 
+    cat_rows = (await db.execute(select(Category))).scalars().all()
+    cat_map = {(c.specialization_id, c.grade_id): c.id for c in cat_rows}
+    cat_slug_map = {c.slug: c.id for c in cat_rows}
+
+    skill_rows = (await db.execute(select(Skill))).scalars().all()
+    skill_map = {s.name.lower(): s.id for s in skill_rows}
+    skill_slug_map = {s.slug.lower(): s.id for s in skill_rows}
+
     # If reference tables are empty, ensure fallback mappings exist
     if not spec_map or not grade_map:
         raise HTTPException(
@@ -331,6 +346,60 @@ async def seed_demo_dataset(
                     rating_points=c_data.get("rating_points", 15),
                 )
                 db.add(ach)
+
+        # Seed CandidateCategorization (Defect N14)
+        c_spec = c_data.get("specialization")
+        c_grade = c_data.get("grade")
+        s_id = spec_map.get(c_spec)
+        g_id = grade_map.get(c_grade)
+        cat_id = cat_map.get((s_id, g_id)) or cat_slug_map.get(f"{c_spec}_{c_grade}")
+        if s_id and g_id and cat_id:
+            cat_q = await db.execute(
+                select(CandidateCategorization).where(
+                    CandidateCategorization.candidate_profile_id == prof.id,
+                    CandidateCategorization.is_current.is_(True),
+                )
+            )
+            existing_cat = cat_q.scalar_one_or_none()
+            now_dt = datetime.now(timezone.utc)
+            theta_score = float(c_data.get("theta", 80.0))
+            if not existing_cat:
+                new_cat = CandidateCategorization(
+                    candidate_profile_id=prof.id,
+                    category_id=cat_id,
+                    confirmed_grade_id=g_id,
+                    test_score=theta_score,
+                    assigned_at=now_dt,
+                    cooldown_until=now_dt,
+                    is_current=True,
+                )
+                db.add(new_cat)
+            else:
+                existing_cat.category_id = cat_id
+                existing_cat.confirmed_grade_id = g_id
+                existing_cat.test_score = theta_score
+
+        # Seed CandidateSkill (Defect N14)
+        for s_name in c_data.get("skills", []):
+            s_clean = s_name.strip().lower()
+            target_sk_id = skill_map.get(s_clean) or skill_slug_map.get(s_clean)
+            if target_sk_id:
+                cs_q = await db.execute(
+                    select(CandidateSkill).where(
+                        CandidateSkill.candidate_profile_id == prof.id,
+                        CandidateSkill.skill_id == target_sk_id,
+                    )
+                )
+                if not cs_q.scalar_one_or_none():
+                    cand_sk = CandidateSkill(
+                        candidate_profile_id=prof.id,
+                        skill_id=target_sk_id,
+                        years_experience=2.0,
+                        proficiency_level="intermediate",
+                        is_core=True,
+                        is_verified=has_fsp,
+                    )
+                    db.add(cand_sk)
 
     # 2. Seed Employer Profile for Needs & Vacancies
     emp_email = "corporate.demo@fsp-russia.ru"

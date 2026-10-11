@@ -5,6 +5,7 @@ Defined in docs/03 §5.2, docs/05 §5.6.10, and DISPATCH.md.
 """
 from __future__ import annotations
 
+import html
 import io
 import os
 from pathlib import Path
@@ -47,43 +48,60 @@ FONTS_DIR = BRAND_DIR / "fonts"
 LINELINE_IMG = BRAND_DIR / "lineline1.png"
 LOGO_IMG = BRAND_DIR / "logo_small_blue.png"
 
-# Register local TTF fonts
-FONT_REGULAR = "JetBrainsMono"
-FONT_BOLD = "JetBrainsMono-Bold"
-FONT_MEDIUM = "JetBrainsMono-Medium"
+# Safe Cyrillic font registration with DejaVu fallback (Defect N16)
+def _register_cyrillic_fonts() -> tuple[str, str, str]:
+    regular_name = "JetBrainsMono"
+    bold_name = "JetBrainsMono-Bold"
+    medium_name = "JetBrainsMono-Medium"
 
-try:
     reg_path = FONTS_DIR / "JetBrainsMono-Regular.ttf"
     bold_path = FONTS_DIR / "JetBrainsMono-Bold.ttf"
     med_path = FONTS_DIR / "JetBrainsMono-Medium.ttf"
 
-    if reg_path.exists():
-        pdfmetrics.registerFont(TTFont(FONT_REGULAR, str(reg_path)))
-    else:
-        FONT_REGULAR = "Helvetica"
+    try:
+        if reg_path.exists():
+            pdfmetrics.registerFont(TTFont(regular_name, str(reg_path)))
+        else:
+            raise FileNotFoundError("Brand JetBrainsMono font not found")
 
-    if bold_path.exists():
-        pdfmetrics.registerFont(TTFont(FONT_BOLD, str(bold_path)))
-    else:
-        FONT_BOLD = "Helvetica-Bold"
+        if bold_path.exists():
+            pdfmetrics.registerFont(TTFont(bold_name, str(bold_path)))
+        else:
+            bold_name = regular_name
 
-    if med_path.exists():
-        pdfmetrics.registerFont(TTFont(FONT_MEDIUM, str(med_path)))
-    else:
-        FONT_MEDIUM = FONT_BOLD
+        if med_path.exists():
+            pdfmetrics.registerFont(TTFont(medium_name, str(med_path)))
+        else:
+            medium_name = bold_name
 
-    if hasattr(pdfmetrics, "registerFontFamily") and FONT_REGULAR == "JetBrainsMono":
-        pdfmetrics.registerFontFamily(
-            FONT_REGULAR,
-            normal=FONT_REGULAR,
-            bold=FONT_BOLD,
-            italic=FONT_REGULAR,
-            boldItalic=FONT_BOLD,
-        )
-except Exception:
-    FONT_REGULAR = "Helvetica"
-    FONT_BOLD = "Helvetica-Bold"
-    FONT_MEDIUM = "Helvetica-Bold"
+        if hasattr(pdfmetrics, "registerFontFamily"):
+            pdfmetrics.registerFontFamily(
+                regular_name,
+                normal=regular_name,
+                bold=bold_name,
+                italic=regular_name,
+                boldItalic=bold_name,
+            )
+        return regular_name, bold_name, medium_name
+    except Exception:
+        # Fallback to system DejaVuSans if available
+        system_dejavu_candidates = [
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+        ]
+        for fpath in system_dejavu_candidates:
+            if fpath.exists():
+                try:
+                    pdfmetrics.registerFont(TTFont("DejaVuSansFallback", str(fpath)))
+                    return "DejaVuSansFallback", "DejaVuSansFallback", "DejaVuSansFallback"
+                except Exception:
+                    continue
+        return "Helvetica", "Helvetica-Bold", "Helvetica-Bold"
+
+
+FONT_REGULAR, FONT_BOLD, FONT_MEDIUM = _register_cyrillic_fonts()
 
 
 def generate_fsp_profile_pdf(
@@ -176,20 +194,20 @@ def generate_fsp_profile_pdf(
     # 2. Candidate Identification
     cand_id = candidate_data.get("id", 1001)
     if is_full_mode:
-        cand_name = candidate_data.get("full_name") or f"{candidate_data.get('first_name', 'Иван')} {candidate_data.get('last_name', 'Иванов')}"
+        cand_name = html.escape(str(candidate_data.get("full_name") or f"{candidate_data.get('first_name', 'Иван')} {candidate_data.get('last_name', 'Иванов')}"))
         story.append(Paragraph(f"<b>Кандидат:</b> {cand_name}", h2_style))
 
-        email = candidate_data.get("email") or "—"
-        phone = candidate_data.get("phone") or "—"
-        tg = candidate_data.get("telegram") or "—"
-        github = candidate_data.get("github_url") or "—"
+        email = html.escape(str(candidate_data.get("email") or "—"))
+        phone = html.escape(str(candidate_data.get("phone") or "—"))
+        tg = html.escape(str(candidate_data.get("telegram") or "—"))
+        github = html.escape(str(candidate_data.get("github_url") or "—"))
         contacts_html = f"Email: <b>{email}</b> | Телефон: <b>{phone}</b><br/>Telegram: <b>{tg}</b> | GitHub: <b>{github}</b>"
         story.append(Paragraph(contacts_html, body_style))
     else:
-        first = candidate_data.get("first_name", "Алексей")
-        last = candidate_data.get("last_name", "Кузнецов")
+        first = html.escape(str(candidate_data.get("first_name", "Алексей")))
+        last = html.escape(str(candidate_data.get("last_name", "Кузнецов")))
         initial = f"{last[:1]}." if last else ""
-        masked_name = candidate_data.get("masked_name") or f"{first} {initial} (#C-{cand_id})"
+        masked_name = html.escape(str(candidate_data.get("masked_name") or f"{first} {initial} (#C-{cand_id})"))
         story.append(Paragraph(f"<b>Кандидат:</b> {masked_name}", h2_style))
         story.append(Paragraph("<b>[КОНТАКТЫ ЗАЩИЩЕНЫ 152-ФЗ РФ]</b>", badge_style))
         story.append(
@@ -212,8 +230,8 @@ def generate_fsp_profile_pdf(
     grade_valid = bool(raw_grade and str(raw_grade).strip().lower() not in invalid_grades)
 
     if spec_valid and grade_valid:
-        spec_text = str(raw_spec).capitalize()
-        grade_text = str(raw_grade).capitalize()
+        spec_text = html.escape(str(raw_spec).capitalize())
+        grade_text = html.escape(str(raw_grade).capitalize())
         qual_text = f"Квалификация: <b>{spec_text} · {grade_text}</b>"
     else:
         qual_text = "Квалификация: <b>Ожидает верификации</b>"
@@ -246,9 +264,12 @@ def generate_fsp_profile_pdf(
         badge = "Верифицирован в реестре ФСП" if fsp_verified else "В процессе верификации"
         raw_rank = candidate_data.get("sport_rank")
         rank = str(raw_rank) if raw_rank and str(raw_rank).strip().lower() not in ("none", "") else "Без спортивного разряда"
+        badge_esc = html.escape(badge)
+        rank_esc = html.escape(rank)
+        fsp_id_esc = html.escape(str(fsp_id))
         fsp_text = (
-            f"Статус: <b>{badge}</b> (ФСП ID: {fsp_id})<br/>"
-            f"Спортивный разряд: <b>{rank}</b>"
+            f"Статус: <b>{badge_esc}</b> (ФСП ID: {fsp_id_esc})<br/>"
+            f"Спортивный разряд: <b>{rank_esc}</b>"
         )
         story.append(Paragraph(fsp_text, body_style))
 
@@ -257,10 +278,10 @@ def generate_fsp_profile_pdf(
             story.append(Spacer(1, 4))
             ach_lines = []
             for ach in achievements[:4]:
-                champ = ach.get("championship_name", "Всероссийский чемпионат")
-                disc = ach.get("discipline", "algorithmic")
-                place = ach.get("place", "Финалист")
-                medal = ach.get("medal", "")
+                champ = html.escape(str(ach.get("championship_name", "Всероссийский чемпионат")))
+                disc = html.escape(str(ach.get("discipline", "algorithmic")))
+                place = html.escape(str(ach.get("place", "Финалист")))
+                medal = html.escape(str(ach.get("medal", "")))
                 medal_str = f" ({medal})" if medal else ""
                 ach_lines.append(f"• {champ} [{disc}]: {place}{medal_str}")
             story.append(Paragraph("<br/>".join(ach_lines), body_style))
@@ -277,7 +298,7 @@ def generate_fsp_profile_pdf(
     story.append(Paragraph("ПОДТВЕРЖДЕННЫЙ ТЕХНОЛОГИЧЕСКИЙ СТЕК", h2_style))
     skills = candidate_data.get("skills", [])
     if skills:
-        skills_str = ", ".join(skills)
+        skills_str = ", ".join(html.escape(str(s)) for s in skills)
         story.append(Paragraph(f"Технологии: {skills_str}", body_style))
     else:
         story.append(
@@ -306,7 +327,10 @@ def generate_fsp_profile_pdf(
     else:
         sal_str = "Не указана (по договоренности)"
 
-    cond_text = f"Город: <b>{city_str}</b> | Формат работы: <b>{fmt_str}</b> | Ожидаемая ЗП: <b>{sal_str}</b>"
+    city_esc = html.escape(city_str)
+    fmt_esc = html.escape(fmt_str)
+    sal_esc = html.escape(sal_str)
+    cond_text = f"Город: <b>{city_esc}</b> | Формат работы: <b>{fmt_esc}</b> | Ожидаемая ЗП: <b>{sal_esc}</b>"
     story.append(Paragraph(cond_text, body_style))
 
     # Watermark callback for Mode A

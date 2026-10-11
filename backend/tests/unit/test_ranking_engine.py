@@ -273,3 +273,12 @@ def test_aggregate_candidate_fsp_data_none_and_empty():
     assert empty_agg["fsp_id"] == "FSP-200"
     assert empty_agg["sport_rank"] is None
     assert empty_agg["rating_points"] == 0
+
+
+def test_grade_multiplier_none_and_invalid_types():
+    """Дефект N10: безопасная обработка None и невалидных типов грейда."""
+    assert calculate_grade_multiplier(None, "middle") == 1.00
+    assert calculate_grade_multiplier("senior", None) == 0.93
+    assert calculate_grade_multiplier(None, None) == 1.00
+    assert calculate_grade_multiplier("invalid_grade", "middle") == 1.00
+    assert calculate_grade_multiplier(object(), 2) == 1.00

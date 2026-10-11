@@ -333,11 +333,20 @@ def test_cooldown_status_and_jury_demo_bypass(client):
     assert cd_resp.status_code == 200
     assert cd_resp.json()["is_cooldown_active"] is False
 
-    # 2. Выполнение демо-сброса для жюри (POST /cooldown-status/jury-reset)
+    # 2. Выполнение демо-сброса для кандидата должно возвращать 403 Forbidden
+    cand_reset_resp = client.post(
+        "/api/v1/assessment/cooldown-status/jury-reset",
+        json={"reason": "candidate_bypass_attempt"},
+        headers=headers,
+    )
+    assert cand_reset_resp.status_code == 403
+
+    # 3. Выполнение демо-сброса для админа/жюри (role='admin') должно успешно сбрасывать кулдаун
+    jury_headers = _register_and_auth(client, email="jury.evaluator@example.com", role="admin")
     reset_resp = client.post(
         "/api/v1/assessment/cooldown-status/jury-reset",
         json={"reason": "jury_demonstration_test"},
-        headers=headers,
+        headers=jury_headers,
     )
     assert reset_resp.status_code == 200
     assert reset_resp.json()["is_cooldown_active"] is False

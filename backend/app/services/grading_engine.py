@@ -30,7 +30,7 @@ class GradingEngine:
         3: "Senior",
         4: "Lead",
     }
-    COOLDOWN_DAYS: int = int(os.getenv("COOLDOWN_DAYS", "30"))
+    COOLDOWN_DAYS: int = int(os.getenv("COOLDOWN_DAYS", "90"))
 
     @classmethod
     def evaluate_session(
@@ -44,7 +44,7 @@ class GradingEngine:
         """
         Оценивает результат тестирования по некарательным правилам платформы:
         - theta < 70.0: без понижения, предлагается ретест на уровень ниже (без кулдауна).
-        - 70.0 <= theta < 88.0: подтверждение грейда, кулдаун 30 дней.
+        - 70.0 <= theta < 88.0: подтверждение грейда, кулдаун 90 дней.
         - theta >= 88.0: подтверждение грейда, добровольный риск-фри буст-тест.
         """
         if now is None:
@@ -69,9 +69,8 @@ class GradingEngine:
                     "message": f"Буст-тест успешно пройден ({theta_score:.1f}/100)! Подтвержден повышенный грейд {canonical_grade}.",
                 }
             else:
-                # Гарантия некарательного буста: сохранение базового грейда без штрафа
+                # Гарантия некарательного буста: сохранение базового грейда без штрафа и без кулдауна
                 prev_grade = cls.RANK_TO_GRADE.get(max(1, current_rank - 1), canonical_grade)
-                cooldown_until = now + timedelta(days=cls.COOLDOWN_DAYS)
                 return {
                     "verdict": "confirmed",
                     "confirmed_grade": prev_grade,
@@ -80,7 +79,7 @@ class GradingEngine:
                     "boost_passed": False,
                     "boost_offered": False,
                     "retest_lower_offered": False,
-                    "cooldown_until": cooldown_until,
+                    "cooldown_until": None,
                     "message": f"Буст-тест не сдан ({theta_score:.1f} < 70). Базовый грейд {prev_grade} сохранен в полном объеме.",
                 }
 

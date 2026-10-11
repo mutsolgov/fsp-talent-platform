@@ -21,23 +21,34 @@ WEIGHTS_WITHOUT_FSP = (0.52, 0.30, 0.00, 0.18)    # Sum = 1.00 (Zero non-FSP pen
 
 
 def calculate_grade_multiplier(
-    candidate_grade: int | str,
-    target_grade: int | str,
+    candidate_grade: int | str | None,
+    target_grade: int | str | None,
 ) -> float:
     """
     Computes grade multiplier based on difference Delta Grade = Cand.rank - Need.rank.
     mult(0) = 1.00, mult(1) = 0.93, mult(-1) = 0.85, mult(2) = 0.60, mult(-2) = 0.45, else = 0.25
+    Robust against None, invalid strings, and non-numeric types.
     """
-    cand_rank = (
-        GRADE_RANK_MAP.get(candidate_grade.lower().strip(), 2)
-        if isinstance(candidate_grade, str)
-        else int(candidate_grade)
-    )
-    target_rank = (
-        GRADE_RANK_MAP.get(target_grade.lower().strip(), 2)
-        if isinstance(target_grade, str)
-        else int(target_grade)
-    )
+    if candidate_grade is None:
+        cand_rank = 2  # Безопасный Middle fallback
+    elif isinstance(candidate_grade, str):
+        cand_rank = GRADE_RANK_MAP.get(candidate_grade.lower().strip(), 2)
+    else:
+        try:
+            cand_rank = int(candidate_grade)
+        except (ValueError, TypeError):
+            cand_rank = 2
+
+    if target_grade is None:
+        target_rank = 2  # Безопасный Middle fallback
+    elif isinstance(target_grade, str):
+        target_rank = GRADE_RANK_MAP.get(target_grade.lower().strip(), 2)
+    else:
+        try:
+            target_rank = int(target_grade)
+        except (ValueError, TypeError):
+            target_rank = 2
+
     diff = cand_rank - target_rank
 
     if diff == 0:
@@ -143,8 +154,8 @@ def calculate_weights(has_fsp: bool) -> Tuple[float, float, float, float]:
 def calculate_candidate_score(
     cand_spec: str,
     need_spec: str,
-    cand_grade: int | str,
-    need_grade: int | str,
+    cand_grade: int | str | None,
+    need_grade: int | str | None,
     theta_score: float,
     candidate_skills: Iterable[str],
     core_stack: Iterable[str],
