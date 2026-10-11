@@ -49,6 +49,18 @@ async_session_factory = async_sessionmaker(
 )
 
 
+async def ensure_keycloak_schema() -> None:
+    """Ensure keycloak schema exists and grant all privileges to fsp_user in PostgreSQL."""
+    if "postgresql" in settings.DATABASE_URL:
+        try:
+            from sqlalchemy import text
+            async with engine.begin() as conn:
+                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS keycloak;"))
+                await conn.execute(text("GRANT ALL ON SCHEMA keycloak TO fsp_user;"))
+        except Exception:
+            pass
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for obtaining an asynchronous DB session with automatic rollback on error."""
     async with async_session_factory() as session:

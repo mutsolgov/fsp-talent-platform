@@ -11,16 +11,16 @@ declare const expect: any;
 declare const renderToString: (el: React.ReactElement) => string;
 declare const vi: any;
 
-describe('CooldownTimer Component & 90-Day Bypass Logic', () => {
+describe('CooldownTimer Component & 30-Day Bypass Logic', () => {
   beforeEach(() => {
     useJuryDemoStore.getState().setCooldownBypass(false);
   });
 
-  describe('90-Day Interval Calculations', () => {
-    it('calculates exact 90-day remaining duration breakdown', () => {
+  describe('30-Day Interval Calculations', () => {
+    it('calculates exact 30-day remaining duration breakdown', () => {
       const now = Date.now();
-      const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
-      const targetTime = now + ninetyDaysMs;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const targetTime = now + thirtyDaysMs;
 
       const diff = targetTime - now;
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -28,23 +28,23 @@ describe('CooldownTimer Component & 90-Day Bypass Logic', () => {
       const minutes = Math.floor((diff / (1000 * 60)) % 60);
       const seconds = Math.floor((diff / 1000) % 60);
 
-      expect(days).toBe(90);
+      expect(days).toBe(30);
       expect(hours).toBe(0);
       expect(minutes).toBe(0);
       expect(seconds).toBe(0);
     });
 
     it('calculates remaining duration with non-zero hours, minutes and seconds', () => {
-      // 89 days, 14 hours, 32 minutes, 45 seconds
+      // 29 days, 14 hours, 32 minutes, 45 seconds
       const diff =
-        89 * 86400000 + 14 * 3600000 + 32 * 60000 + 45 * 1000;
+        29 * 86400000 + 14 * 3600000 + 32 * 60000 + 45 * 1000;
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const minutes = Math.floor((diff / (1000 * 60)) % 60);
       const seconds = Math.floor((diff / 1000) % 60);
 
-      expect(days).toBe(89);
+      expect(days).toBe(29);
       expect(hours).toBe(14);
       expect(minutes).toBe(32);
       expect(seconds).toBe(45);
@@ -61,13 +61,15 @@ describe('CooldownTimer Component & 90-Day Bypass Logic', () => {
       );
 
       expect(html).toContain('Кулдаун не активен — повторное тестирование доступно');
+      expect(html).toContain('Пройти калибровку');
+      expect(html).toContain('href="/candidate/assessment"');
       expect(html).not.toContain('role="timer"');
     });
 
     it('renders role="timer" and bypass button when bypass mode is active in jury demo store', () => {
       useJuryDemoStore.getState().setCooldownBypass(true);
 
-      const futureDate = new Date(Date.now() + 90 * 86400 * 1000).toISOString();
+      const futureDate = new Date(Date.now() + 30 * 86400 * 1000).toISOString();
       const html = renderToString(
         React.createElement(CooldownTimer, {
           cooldownUntil: futureDate,
@@ -77,8 +79,8 @@ describe('CooldownTimer Component & 90-Day Bypass Logic', () => {
 
       expect(html).toContain('role="timer"');
       expect(html).toContain('aria-live="polite"');
-      expect(html).toContain('Кулдаун 90 дней активен');
-      expect(html).toContain('Сбросить кулдаун 90 дней (Демо)');
+      expect(html).toContain('Кулдаун 30 дней активен');
+      expect(html).toContain('Сбросить кулдаун 30 дней (Демо)');
     });
   });
 

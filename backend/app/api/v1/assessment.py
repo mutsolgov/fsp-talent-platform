@@ -541,6 +541,14 @@ async def submit_task_answer(
         ans.points_awarded = 1.0 if is_correct else 0.0
         ans.time_taken_sec = time_taken
 
+    tab_switches = payload.tab_switch_count or 0
+    if tab_switches > 0:
+        flags = dict(sess.anti_fraud_flags_json or {})
+        flags["tab_switch_count"] = flags.get("tab_switch_count", 0) + tab_switches
+        if flags["tab_switch_count"] >= 3:
+            flags["tab_switch_warning"] = True
+        sess.anti_fraud_flags_json = flags
+
     await db.commit()
 
     return SubmitTaskAnswerResponse(

@@ -16,7 +16,7 @@ GRADE_RANK_MAP: Dict[str, int] = {
 }
 
 # Dynamic weights
-WEIGHTS_WITH_FSP = (0.35, 0.25, 0.25, 0.15)       # w_test, w_stack, w_fsp, w_freshness
+WEIGHTS_WITH_FSP = (0.40, 0.25, 0.20, 0.15)       # w_test, w_stack, w_fsp, w_freshness (ТЗ ФСП)
 WEIGHTS_WITHOUT_FSP = (0.52, 0.30, 0.00, 0.18)    # Sum = 1.00 (Zero non-FSP penalty)
 
 

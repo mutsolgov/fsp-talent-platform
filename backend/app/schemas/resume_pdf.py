@@ -42,6 +42,10 @@ class ResumeParsedResponse(BaseSchema):
     detected_telegram: Optional[str] = None
     detected_github: Optional[str] = None
     detected_city: Optional[str] = None
+    detected_specialization: Optional[str] = None
+    detected_grade: Optional[str] = None
+    detected_salary_min: Optional[int] = None
+    detected_salary_max: Optional[int] = None
     extracted_skills: List[str] = Field(default_factory=list)
     detected_skills: List[str] = Field(default_factory=list)
     work_experience: List[ParsedWorkExperience] = Field(default_factory=list)

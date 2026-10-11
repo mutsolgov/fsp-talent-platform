@@ -1,12 +1,13 @@
 """
 FSP IT-Talent Platform — Non-Coercive Grading Engine & Cooldown Controller.
-Implements non-punitive assessment evaluation, 90-day cooldown, and jury bypass.
+Implements non-punitive assessment evaluation, 30-day cooldown, and jury bypass.
 Defined in docs/03_ALGORITHMS_AND_BUSINESS_LOGIC.md §2.4–2.5 and DISPATCH.md.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import math
+import os
 from typing import Any, Dict, Optional, Tuple
 
 
@@ -29,7 +30,7 @@ class GradingEngine:
         3: "Senior",
         4: "Lead",
     }
-    COOLDOWN_DAYS: int = 90
+    COOLDOWN_DAYS: int = int(os.getenv("COOLDOWN_DAYS", "30"))
 
     @classmethod
     def evaluate_session(
@@ -43,7 +44,7 @@ class GradingEngine:
         """
         Оценивает результат тестирования по некарательным правилам платформы:
         - theta < 70.0: без понижения, предлагается ретест на уровень ниже (без кулдауна).
-        - 70.0 <= theta < 88.0: подтверждение грейда, кулдаун 90 дней.
+        - 70.0 <= theta < 88.0: подтверждение грейда, кулдаун 30 дней.
         - theta >= 88.0: подтверждение грейда, добровольный риск-фри буст-тест.
         """
         if now is None:
@@ -175,7 +176,7 @@ class GradingEngine:
             remaining_days = max(1, math.ceil((cooldown_until - now).total_seconds() / 86400.0))
             return (
                 False,
-                f"Действует 90-дневный кулдаун смены грейда (осталось {remaining_days} дн.). Доступен демо-сброс для жюри.",
+                f"Действует {cls.COOLDOWN_DAYS}-дневный кулдаун смены грейда (осталось {remaining_days} дн.). Доступен демо-сброс для жюри.",
             )
 
         return True, None

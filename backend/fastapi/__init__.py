@@ -287,14 +287,18 @@ class FastAPI:
         docs_url: Optional[str] = "/docs",
         redoc_url: Optional[str] = "/redoc",
         openapi_url: Optional[str] = "/openapi.json",
+        lifespan: Optional[Any] = None,
+        **kwargs: Any,
     ):
         self.title = title
         self.version = version
         self.description = description
+        self.lifespan = lifespan
         self.routes: list[Route] = []
         self.exception_handlers: dict[Any, Callable[..., Any]] = {}
         self.middlewares: list[Any] = []
         self.dependency_overrides: dict[Any, Any] = {}
+        self.extra = kwargs
 
     def include_router(self, router: APIRouter, prefix: str = "", tags: Optional[list[str]] = None) -> None:
         p = prefix.rstrip("/")
@@ -610,6 +614,12 @@ class testclient:
     class TestClient:
         def __init__(self, app: FastAPI):
             self.app = app
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
 
         def request(
             self,

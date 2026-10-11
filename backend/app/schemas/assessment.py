@@ -80,6 +80,7 @@ class SubmitTaskAnswerRequest(BaseSchema):
     task_index: int = Field(..., ge=0, le=12)
     answer_payload: Union[str, Dict[str, Any]] = Field(..., description="Исходный код решения или ключ ответа")
     time_spent_seconds: Optional[int] = Field(default=0)
+    tab_switch_count: Optional[int] = Field(default=0)
 
 
 class SubmitTaskAnswerResponse(BaseSchema):

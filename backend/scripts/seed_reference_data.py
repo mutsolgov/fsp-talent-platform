@@ -21,7 +21,7 @@ if backend_dir not in sys.path:
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import async_session_factory, engine
+from app.database import async_session_factory, engine, ensure_keycloak_schema
 from app.models.base import Base
 from app.models.specializations import Specialization
 from app.models.grades import Grade
@@ -168,6 +168,7 @@ def make_slug(name: str) -> str:
 
 async def seed_reference_data(session: AsyncSession) -> dict[str, int]:
     """Execute complete reference data seeding."""
+    await ensure_keycloak_schema()
     stats = {"specializations": 0, "grades": 0, "categories": 0, "skills": 0}
 
     # 1. Specializations
@@ -278,6 +279,9 @@ async def main() -> None:
     print("=" * 70)
     print("FSP IT-Talent Platform — Seeding Reference Data")
     print("=" * 70)
+
+    # Ensure keycloak schema exists if running on PostgreSQL
+    await ensure_keycloak_schema()
 
     # Ensure tables exist
     async with engine.begin() as conn:

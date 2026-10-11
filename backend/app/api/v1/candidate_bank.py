@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.v1.auth import get_current_user
 from app.api.v1.employer_needs import get_current_employer
 from app.database import get_db
+from app.models.audit_logs import AuditLog
 from app.models.candidate_profiles import CandidateProfile
 from app.models.candidate_categorizations import CandidateCategorization
 from app.models.candidate_skills import CandidateSkill
@@ -844,6 +845,22 @@ async def get_candidate_contacts(
 
     has_access = await check_contact_access(db, cand.id, current_user)
     if has_access or current_user.role == "admin":
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="UNMASK_CONTACTS_152FZ",
+            entity_type="candidate_profile",
+            entity_id=str(cand.id),
+            payload_json={
+                "candidate_id": cand.id,
+                "role": current_user.role,
+                "reason": "admin_access" if current_user.role == "admin" else "invitation_accepted",
+            },
+            ip_address="127.0.0.1",
+            user_agent="FSP Platform Web Client",
+        )
+        db.add(audit)
+        await db.commit()
+
         full_name = format_full_name(cand.first_name, cand.last_name, cand.middle_name)
         return CandidateUnmaskedContactsResponse(
             candidate_id=cand.id,

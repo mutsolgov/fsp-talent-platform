@@ -11,8 +11,9 @@ from sqlalchemy.orm import selectinload
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_current_user_flexible
 from app.database import get_db
+from app.models.audit_logs import AuditLog
 from app.models.candidate_categorizations import CandidateCategorization
 from app.models.candidate_profiles import CandidateProfile
 from app.models.candidate_skills import CandidateSkill
@@ -79,6 +80,10 @@ async def upload_and_parse_resume(
             profile.telegram = parsed_data["detected_telegram"]
         if parsed_data.get("detected_github") and not profile.github_url:
             profile.github_url = parsed_data["detected_github"]
+        if parsed_data.get("detected_city") and not profile.city:
+            profile.city = parsed_data["detected_city"]
+        if parsed_data.get("detected_salary_min") and not profile.expected_salary:
+            profile.expected_salary = parsed_data["detected_salary_min"]
 
         # Сохраняем разобранные данные
         curr_survey = profile.survey_data_json or {}
@@ -109,21 +114,21 @@ async def get_parsed_resume(
             detected_phone=profile.phone if profile else None,
             detected_telegram=profile.telegram if profile else None,
             detected_github=profile.github_url if profile else None,
-            detected_city=profile.city if profile else "Москва",
+            detected_city=profile.city if profile else None,
             extracted_skills=[],
             work_experience=[],
             education=[],
-            total_experience_months=24,
-            raw_text_length=120,
+            total_experience_months=0,
+            raw_text_length=0,
         )
 
     return ResumeParsedResponse(**profile.survey_data_json["parsed_resume"])
 
 
 def _build_candidate_pdf_data(cand: CandidateProfile) -> Dict[str, Any]:
-    spec = "Backend"
-    grade = "Middle"
-    theta = cand.freshness_score or 85.0
+    spec: Optional[str] = None
+    grade: Optional[str] = None
+    theta: Optional[float] = None
 
     if cand.candidate_categorizations:
         curr_cat = next((c for c in cand.candidate_categorizations if c.is_current), cand.candidate_categorizations[0])
@@ -139,9 +144,9 @@ def _build_candidate_pdf_data(cand: CandidateProfile) -> Dict[str, Any]:
     if not skills and cand.survey_data_json and isinstance(cand.survey_data_json, dict):
         skills = cand.survey_data_json.get("skills", [])
     if not skills:
-        skills = ["Python", "FastAPI", "PostgreSQL", "Docker"]
+        skills = []
 
-    sport_rank = None
+    sport_rank: Optional[str] = None
     achievements = []
     if cand.fsp_achievements:
         for a in cand.fsp_achievements:
@@ -157,9 +162,6 @@ def _build_candidate_pdf_data(cand: CandidateProfile) -> Dict[str, Any]:
             })
     elif cand.survey_data_json and isinstance(cand.survey_data_json, dict) and "fsp_achievements" in cand.survey_data_json:
         achievements = cand.survey_data_json["fsp_achievements"]
-
-    if not sport_rank and cand.fsp_id:
-        sport_rank = "1-й спортивный разряд"
 
     masked_name = format_masked_name(cand.first_name or "Соискатель", cand.last_name or "ФСП", cand.id)
 
@@ -181,9 +183,9 @@ def _build_candidate_pdf_data(cand: CandidateProfile) -> Dict[str, Any]:
         "fsp_verified": cand.fsp_verified,
         "sport_rank": sport_rank,
         "skills": skills,
-        "city": cand.city or "Москва",
-        "work_format": cand.work_format or "remote",
-        "expected_salary": cand.expected_salary or 200000,
+        "city": cand.city,
+        "work_format": cand.work_format,
+        "expected_salary": cand.expected_salary,
         "fsp_achievements": achievements,
     }
 
@@ -215,7 +217,7 @@ async def _get_candidate_with_relations(candidate_id: int, db: AsyncSession) -> 
 )
 async def get_anonymized_resume_pdf(
     candidate_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     cand = await _get_candidate_with_relations(candidate_id, db)
@@ -237,7 +239,7 @@ async def get_anonymized_resume_pdf(
 )
 async def get_full_resume_pdf(
     candidate_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     cand = await _get_candidate_with_relations(candidate_id, db)
@@ -253,6 +255,23 @@ async def get_full_resume_pdf(
 
     data = _build_candidate_pdf_data(cand)
     pdf_bytes = generate_fsp_profile_pdf(data, is_full_mode=True)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="DOWNLOAD_FULL_PDF_152FZ",
+        entity_type="candidate_profile",
+        entity_id=str(cand.id),
+        payload_json={
+            "candidate_id": cand.id,
+            "role": current_user.role,
+            "mode": "full",
+        },
+        ip_address="127.0.0.1",
+        user_agent="FSP Platform PDF Export",
+    )
+    db.add(audit)
+    await db.commit()
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -267,7 +286,7 @@ async def get_full_resume_pdf(
 async def export_fsp_profile_pdf(
     candidate_id: int,
     mode: str = Query("auto"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     cand = await _get_candidate_with_relations(candidate_id, db)
@@ -303,7 +322,7 @@ async def export_fsp_profile_pdf(
     summary="Предпросмотр собственного полного PDF соискателем (Mode B)",
 )
 async def preview_own_resume_pdf(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     stmt = (

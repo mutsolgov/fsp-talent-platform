@@ -16,18 +16,60 @@ export const CandidatePrivacyPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [archiveNotice, setArchiveNotice] = useState<string | null>(null);
   const [revokeNotice, setRevokeNotice] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
 
   const handleSave = async () => {
     setError(null);
+    setIsSaving(true);
     try {
       await api.put('/auth/consents', {
         consent_profile_publication: pub,
+        consent_pdn_processing: pdn,
       });
       setConsents(pdn, pub);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err?.message || 'Ошибка сохранения настроек приватности');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка сохранения настроек приватности');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportArchive = async () => {
+    setIsExporting(true);
+    setArchiveNotice(null);
+    setError(null);
+    try {
+      await api.downloadBlob('/auth/export-archive', 'fsp_user_archive_152fz.json');
+      setArchiveNotice('Машиночитаемый архив ПДн (152-ФЗ) успешно сформирован и скачан');
+      setTimeout(() => setArchiveNotice(null), 5000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка при экспорте архива данных 152-ФЗ');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleConfirmRevoke = async () => {
+    setIsRevoking(true);
+    setError(null);
+    try {
+      await api.post('/auth/consents/revoke');
+      setPdn(false);
+      setPub(false);
+      setConsents(false, false);
+      setShowRevokeModal(false);
+      setRevokeNotice('Согласия успешно отозваны в соответствии со ст. 21 152-ФЗ. Персональные данные анонимизированы.');
+      setTimeout(() => setRevokeNotice(null), 6000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка при отзыве согласий');
+      setShowRevokeModal(false);
+    } finally {
+      setIsRevoking(false);
     }
   };
 
@@ -83,7 +125,7 @@ export const CandidatePrivacyPage: React.FC = () => {
           />
 
           <div className="pt-2">
-            <Button variant="fsp_mint" size="md" onClick={handleSave}>
+            <Button variant="fsp_mint" size="md" isLoading={isSaving} disabled={isSaving} onClick={handleSave}>
               <span>Сохранить настройки приватности</span>
             </Button>
           </div>
@@ -133,13 +175,12 @@ export const CandidatePrivacyPage: React.FC = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => {
-                setArchiveNotice('Формирование архива ПДн 152-ФЗ начато');
-                setTimeout(() => setArchiveNotice(null), 5000);
-              }}
+              isLoading={isExporting}
+              disabled={isExporting}
+              onClick={handleExportArchive}
             >
               <Download size={14} />
-              <span>Экспорт архива (152-ФЗ)</span>
+              <span>{isExporting ? 'Экспорт архива...' : 'Экспорт архива (152-ФЗ)'}</span>
             </Button>
           </div>
 
@@ -159,10 +200,7 @@ export const CandidatePrivacyPage: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              onClick={() => {
-                setRevokeNotice('Запрос на отзыв согласий зарегистрирован по ст. 21 152-ФЗ');
-                setTimeout(() => setRevokeNotice(null), 5000);
-              }}
+              onClick={() => setShowRevokeModal(true)}
             >
               <Trash2 size={14} />
               <span>Отозвать согласия</span>
@@ -170,6 +208,48 @@ export const CandidatePrivacyPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal confirmation for revoking consents */}
+      {showRevokeModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="revoke-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+        >
+          <div className="bg-[#202129] border border-[#3D3E42] rounded-[16px] max-w-md w-full p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <AlertCircle size={24} className="shrink-0" />
+              <h3 id="revoke-modal-title" className="font-mono text-base font-bold text-white">
+                Подтверждение отзыва согласий (ст. 21 152-ФЗ)
+              </h3>
+            </div>
+            <p className="text-xs text-[#9B9C9E] font-sans leading-relaxed">
+              Вы действительно хотите отозвать согласие на обработку персональных данных и публикацию профиля? Все ваши данные будут обезличены, а профиль скрыт из Банка талантов.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2D2E37]">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isRevoking}
+                onClick={() => setShowRevokeModal(false)}
+              >
+                <span>Отмена</span>
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                isLoading={isRevoking}
+                disabled={isRevoking}
+                onClick={handleConfirmRevoke}
+              >
+                <Trash2 size={14} />
+                <span>Отозвать согласия</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </CandidateLayout>
   );
 };

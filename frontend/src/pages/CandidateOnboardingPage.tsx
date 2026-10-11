@@ -4,6 +4,7 @@ import { ResumeUploader, ResumeParsedResponse } from '../components/organisms/Re
 import { Badge } from '../components/atoms/Badge';
 import { Button } from '../components/atoms/Button';
 import { Select } from '../components/atoms/Select';
+import { SalaryRangeInput } from '../components/molecules/SalaryRangeInput';
 import { FspCircuitConnector } from '../components/atoms/FspCircuitConnector';
 import { ArrowRight, CheckCircle, ShieldCheck, Trophy, Sparkles, AlertCircle } from '../components/icons';
 import { api } from '../api/client';
@@ -13,11 +14,13 @@ export const CandidateOnboardingPage: React.FC = () => {
   const [parsedData, setParsedData] = useState<ResumeParsedResponse | null>(null);
   const [specialization, setSpecialization] = useState('backend');
   const [claimedGrade, setClaimedGrade] = useState('middle');
+  const [city, setCity] = useState<string>('');
   const [fspId, setFspId] = useState('');
   const [hasFsp, setHasFsp] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [salaryMin, setSalaryMin] = useState<number>(150000);
   const [salaryMax, setSalaryMax] = useState<number>(250000);
+  const [isSalaryValid, setIsSalaryValid] = useState<boolean>(true);
   const [consentPdn, setConsentPdn] = useState<boolean>(true);
   const [consentPublish, setConsentPublish] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -56,6 +59,21 @@ export const CandidateOnboardingPage: React.FC = () => {
 
   const handleResumeParsed = (data: ResumeParsedResponse) => {
     setParsedData(data);
+    if (data.specialization && specIdMap[data.specialization]) {
+      setSpecialization(data.specialization);
+    }
+    if (data.grade && gradeIdMap[data.grade]) {
+      setClaimedGrade(data.grade);
+    }
+    if (data.salaryMin) {
+      setSalaryMin(data.salaryMin);
+    }
+    if (data.salaryMax) {
+      setSalaryMax(data.salaryMax);
+    }
+    if (data.city) {
+      setCity(data.city);
+    }
     setStep(2);
   };
 
@@ -70,6 +88,8 @@ export const CandidateOnboardingPage: React.FC = () => {
           ? parsedData.skills
           : [specialization === 'frontend' ? 'TypeScript' : 'Python', 'Algorithms'];
 
+      const resolvedCity = (city || parsedData?.city || '').trim() || 'Москва';
+
       const surveyPayload = {
         specialization_id: specId,
         claimed_grade_id: gradeId,
@@ -79,7 +99,7 @@ export const CandidateOnboardingPage: React.FC = () => {
         expected_salary: Number(salaryMin) || 150000,
         consent_personal_data: consentPdn,
         consent_profile_publish: consentPublish,
-        city: parsedData?.city || 'Москва',
+        city: resolvedCity,
         work_format: 'any',
         relocation_ready: false,
       };
@@ -193,7 +213,61 @@ export const CandidateOnboardingPage: React.FC = () => {
                   <span>Резюме успешно распознано PyMuPDF:</span>
                 </div>
                 <div className="text-xs text-white">
-                  <strong>{parsedData.fullName || 'Кандидат'}</strong> • Опыт: {parsedData.experienceYears || 3}+ лет
+                  <strong>{parsedData.fullName || 'Кандидат'}</strong> • Опыт: {parsedData.experienceYears || 0}+ лет
+                  {parsedData.city && <span> • Город: <strong className="text-[#00F5D4]">{parsedData.city}</strong></span>}
+                </div>
+                <div className="flex flex-wrap gap-2 text-[11px] font-mono text-[#9B9C9E] mt-1">
+                  {parsedData.specialization && (
+                    <button
+                      type="button"
+                      onClick={() => setSpecialization(parsedData.specialization!)}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all border ${
+                        specialization === parsedData.specialization
+                          ? 'bg-[#402FFF]/20 border-[#402FFF] text-white font-bold'
+                          : 'bg-[#2D2E37] border-transparent text-[#00F5D4] hover:border-[#00F5D4]/40'
+                      }`}
+                      title="Нажмите, чтобы применить трек из резюме"
+                    >
+                      Авто-трек: {specializations.find(s => s.value === parsedData.specialization)?.label.split(' ')[0] || parsedData.specialization}
+                    </button>
+                  )}
+                  {parsedData.grade && (
+                    <button
+                      type="button"
+                      onClick={() => setClaimedGrade(parsedData.grade!)}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all border ${
+                        claimedGrade === parsedData.grade
+                          ? 'bg-[#00F5D4]/20 border-[#00F5D4] text-[#00F5D4] font-bold'
+                          : 'bg-[#2D2E37] border-transparent text-[#00F5D4] hover:border-[#00F5D4]/40'
+                      }`}
+                      title="Нажмите, чтобы применить грейд из резюме"
+                    >
+                      Грейд: {parsedData.grade.toUpperCase()}
+                    </button>
+                  )}
+                  {parsedData.salaryMin && parsedData.salaryMax && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSalaryMin(parsedData.salaryMin!);
+                        setSalaryMax(parsedData.salaryMax!);
+                      }}
+                      className="px-2 py-0.5 rounded cursor-pointer bg-[#2D2E37] text-[#FFD700] hover:border-[#FFD700]/40 border border-transparent transition-all"
+                      title="Нажмите, чтобы применить зарплатную вилку из резюме"
+                    >
+                      Вилка: {parsedData.salaryMin.toLocaleString('ru-RU')} — {parsedData.salaryMax.toLocaleString('ru-RU')} ₽
+                    </button>
+                  )}
+                  {parsedData.city && (
+                    <button
+                      type="button"
+                      onClick={() => setCity(parsedData.city!)}
+                      className="px-2 py-0.5 rounded cursor-pointer bg-[#2D2E37] text-[#00F5D4] hover:border-[#00F5D4]/40 border border-transparent transition-all"
+                      title="Нажмите, чтобы применить город из резюме"
+                    >
+                      Город: {parsedData.city}
+                    </button>
+                  )}
                 </div>
                 {parsedData.skills && parsedData.skills.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
@@ -207,53 +281,117 @@ export const CandidateOnboardingPage: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-col gap-4">
-              <Select
-                id="specialization"
-                label="Специализация"
-                options={specializations}
-                value={specialization}
-                onChange={(e) => setSpecialization(e.target.value)}
-              />
+            <div className="flex flex-col gap-5">
+              {/* Specialization Selection with Interactive Chips */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono font-bold text-white flex items-center justify-between">
+                  <span>Специализация (инженерный трек)</span>
+                  <span className="text-[11px] text-[#00F5D4] font-normal">Интерактивный выбор</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {specializations.map((spec) => (
+                    <button
+                      key={spec.value}
+                      type="button"
+                      onClick={() => setSpecialization(spec.value)}
+                      className={`px-3 py-1.5 rounded-[8px] text-xs font-mono transition-all cursor-pointer border ${
+                        specialization === spec.value
+                          ? 'bg-[#402FFF]/25 border-[#402FFF] text-white font-bold shadow-[0_0_12px_rgba(64,47,255,0.4)]'
+                          : 'bg-[#1E1F26] border-[#2D2E37] text-[#9B9C9E] hover:border-[#402FFF]/50 hover:text-white'
+                      }`}
+                    >
+                      {spec.label.split(' (')[0]}
+                    </button>
+                  ))}
+                </div>
+                <Select
+                  id="specialization"
+                  label=""
+                  options={specializations}
+                  value={specialization}
+                  onChange={(e) => setSpecialization(e.target.value)}
+                />
+              </div>
 
-              <Select
-                id="claimedGrade"
-                label="Заявляемый грейд (уровень тестирования)"
-                options={grades}
-                value={claimedGrade}
-                onChange={(e) => setClaimedGrade(e.target.value)}
-              />
+              {/* Target Grade Selection with Interactive Chips */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono font-bold text-white flex items-center justify-between">
+                  <span>Заявляемый целевой грейд</span>
+                  <span className="text-[11px] text-[#00F5D4] font-normal">Уровень сложности KITE</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {grades.map((gr) => (
+                    <button
+                      key={gr.value}
+                      type="button"
+                      onClick={() => setClaimedGrade(gr.value)}
+                      className={`px-3 py-1.5 rounded-[8px] text-xs font-mono transition-all cursor-pointer border ${
+                        claimedGrade === gr.value
+                          ? 'bg-[#00F5D4]/15 border-[#00F5D4] text-[#00F5D4] font-bold shadow-[0_0_12px_rgba(0,245,212,0.3)]'
+                          : 'bg-[#1E1F26] border-[#2D2E37] text-[#9B9C9E] hover:border-[#00F5D4]/50 hover:text-white'
+                      }`}
+                    >
+                      {gr.label.split(' (')[0]}
+                    </button>
+                  ))}
+                </div>
+                <Select
+                  id="claimedGrade"
+                  label=""
+                  options={grades}
+                  value={claimedGrade}
+                  onChange={(e) => setClaimedGrade(e.target.value)}
+                />
+              </div>
             </div>
 
-            {/* Salary Expectations (Mandatory for reverse-recruiting) */}
-            <div className="p-4 rounded-[12px] bg-[#1B1C21] border border-[#2D2E37] flex flex-col gap-3">
-              <span className="text-xs font-mono font-bold text-white">
-                Зарплатные ожидания (вилка от–до в ₽)
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-mono text-[#9B9C9E] block mb-1">Зарплата от (₽):</label>
-                  <input
-                    type="number"
-                    min={10000}
-                    step={10000}
-                    value={salaryMin}
-                    onChange={(e) => setSalaryMin(Number(e.target.value))}
-                    className="w-full bg-[#202129] border border-[#3D3E42] rounded-[8px] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#402FFF]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-mono text-[#9B9C9E] block mb-1">Зарплата до (₽):</label>
-                  <input
-                    type="number"
-                    min={salaryMin}
-                    step={10000}
-                    value={salaryMax}
-                    onChange={(e) => setSalaryMax(Number(e.target.value))}
-                    className="w-full bg-[#202129] border border-[#3D3E42] rounded-[8px] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#402FFF]"
-                  />
-                </div>
+            {/* City & Location Input with Interactive Quick Chips */}
+            <div className="p-4 rounded-[12px] bg-[#1B1C21] border border-[#2D2E37] flex flex-col gap-2.5">
+              <label htmlFor="candidateCity" className="text-xs font-mono font-bold text-white flex items-center justify-between">
+                <span>Город проживания / локация</span>
+                <span className="text-[11px] text-[#9B9C9E] font-normal">152-ФЗ локализация</span>
+              </label>
+              <input
+                id="candidateCity"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Например: Москва, Санкт-Петербург, Новосибирск..."
+                className="w-full bg-[#202129] border border-[#3D3E42] rounded-[8px] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#402FFF]"
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-mono text-[#9B9C9E]">Быстрый выбор:</span>
+                {['Москва', 'Санкт-Петербург', 'Новосибирск', 'Екатеринбург', 'Казань', 'Удаленно'].map((quickCity) => (
+                  <button
+                    key={quickCity}
+                    type="button"
+                    onClick={() => setCity(quickCity)}
+                    className={`px-2.5 py-1 rounded-[6px] text-[11px] font-mono border transition-all cursor-pointer ${
+                      city === quickCity
+                        ? 'bg-[#00F5D4]/15 border-[#00F5D4] text-[#00F5D4] font-bold'
+                        : 'bg-[#202129] border-[#3D3E42] text-[#9B9C9E] hover:text-white hover:border-[#402FFF]'
+                    }`}
+                  >
+                    {quickCity}
+                  </button>
+                ))}
               </div>
+              <span className="text-[11px] font-sans text-[#9B9C9E]">
+                {parsedData?.city ? `Автоопределен из резюме: ${parsedData.city}. Вы можете скорректировать значение при необходимости.` : 'Укажите город или выберите «Удаленно» для распределенной работы.'}
+              </span>
+            </div>
+
+            {/* Salary Expectations (Mandatory for reverse-recruiting via SalaryRangeInput) */}
+            <div className="p-4 rounded-[12px] bg-[#1B1C21] border border-[#2D2E37] flex flex-col gap-3">
+              <SalaryRangeInput
+                salaryMin={salaryMin}
+                salaryMax={salaryMax}
+                onChange={(min, max, valid) => {
+                  setSalaryMin(min);
+                  setSalaryMax(max);
+                  setIsSalaryValid(valid);
+                }}
+              />
             </div>
 
             {/* 152-FZ Consents */}
@@ -279,6 +417,12 @@ export const CandidateOnboardingPage: React.FC = () => {
                 />
                 <span>Согласие на публикацию верифицированного профиля в Банке талантов</span>
               </label>
+              {!consentPdn && (
+                <div className="p-2.5 rounded-[8px] bg-rose-950/40 border border-rose-500/40 text-[#FB7185] text-xs font-sans flex items-center gap-2 mt-1">
+                  <AlertCircle size={16} className="shrink-0" />
+                  <span>Согласие на обработку персональных данных (152-ФЗ) является обязательным для участия в платформе и прохождения тестирования</span>
+                </div>
+              )}
             </div>
 
             {/* FSP ID Integration Block */}
@@ -327,7 +471,12 @@ export const CandidateOnboardingPage: React.FC = () => {
               <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
                 <span>Назад</span>
               </Button>
-              <Button variant="fsp_mint" size="lg" onClick={() => setStep(3)}>
+              <Button
+                variant="fsp_mint"
+                size="lg"
+                disabled={!consentPdn || !isSalaryValid}
+                onClick={() => setStep(3)}
+              >
                 <span>Продолжить к проверке правил</span>
                 <ArrowRight size={16} />
               </Button>

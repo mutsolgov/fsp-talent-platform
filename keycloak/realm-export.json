@@ -1,0 +1,192 @@
+{
+  "realm": "fsp-realm",
+  "displayName": "Федерация спортивного программирования РФ",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Федерация спортивного программирования РФ</span></div>",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "candidate",
+        "description": "Соискатель платформы ФСП"
+      },
+      {
+        "name": "employer",
+        "description": "Работодатель платформы ФСП"
+      },
+      {
+        "name": "admin",
+        "description": "Администратор платформы ФСП"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "fsp-frontend",
+      "name": "FSP Frontend Web SPA",
+      "description": "Публичный OIDC клиент с защитой Authorization Code + PKCE (S256)",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://153.76.194.215/*",
+        "http://153.76.194.215:80/*",
+        "*",
+        "/*",
+        "http://localhost/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "+",
+        "*"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "fsp_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "fsp_id",
+            "claim.name": "fsp_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "fsp-backend",
+      "name": "FSP Backend API",
+      "description": "Bearer-only клиент для бэкенда",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "athlete@fsp-russia.ru",
+      "email": "athlete@fsp-russia.ru",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Алексей",
+      "lastName": "Кузнецов",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fsp_secret_2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "candidate"
+      ],
+      "attributes": {
+        "fsp_id": [
+          "FSP-77-01042"
+        ]
+      }
+    },
+    {
+      "username": "candidate@fsp-russia.ru",
+      "email": "candidate@fsp-russia.ru",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Федор",
+      "lastName": "Федотов",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fsp_secret_2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "candidate"
+      ],
+      "attributes": {
+        "fsp_id": [
+          ""
+        ]
+      }
+    },
+    {
+      "username": "hr@technobank.ru",
+      "email": "hr@technobank.ru",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Елена",
+      "lastName": "Соколова",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fsp_secret_2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "employer"
+      ],
+      "attributes": {}
+    },
+    {
+      "username": "admin@fsp-russia.ru",
+      "email": "admin@fsp-russia.ru",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Главный",
+      "lastName": "Администратор",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "fsp_secret_2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ],
+      "attributes": {}
+    }
+  ]
+}

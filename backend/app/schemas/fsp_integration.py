@@ -61,6 +61,13 @@ class FspConnectResponse(BaseSchema):
     rating_points: int
     achievements_synced: int
     linked_at: datetime
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = "Bearer"
+    role: Optional[str] = "candidate"
+    user_id: Optional[int] = None
+    email: Optional[str] = None
+
 
 
 class FspProfileResponse(BaseSchema):

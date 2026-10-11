@@ -10,6 +10,11 @@ export interface ResumeParsedResponse {
   skills?: string[];
   experienceYears?: number;
   extractedTextSnippet?: string;
+  specialization?: string;
+  grade?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  city?: string;
 }
 
 export interface ResumeUploaderProps {
@@ -48,6 +53,11 @@ export const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParsed, classN
       const experienceYears = data.total_experience_months
         ? Math.round(data.total_experience_months / 12)
         : data.experienceYears || 0;
+      const specialization = data.detected_specialization || data.specialization;
+      const grade = data.detected_grade || data.grade;
+      const salaryMin = data.detected_salary_min || data.salaryMin;
+      const salaryMax = data.detected_salary_max || data.salaryMax;
+      const city = data.detected_city || data.city;
 
       onParsed({
         fullName,
@@ -55,6 +65,11 @@ export const ResumeUploader: React.FC<ResumeUploaderProps> = ({ onParsed, classN
         phone,
         skills,
         experienceYears,
+        specialization,
+        grade,
+        salaryMin,
+        salaryMax,
+        city,
       });
     } catch (err: any) {
       setError(err?.message || 'Ошибка парсинга PDF');

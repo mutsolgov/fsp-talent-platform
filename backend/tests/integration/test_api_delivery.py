@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy import text
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.database import get_db
 from app.main import app
 from app.models.base import Base
@@ -330,4 +331,140 @@ def test_micro_challenges_put_and_delete(client: TestClient):
     del_resp = client.delete(f"/api/v1/micro-challenges/{ch_id}", headers=headers)
     assert del_resp.status_code == 200
     assert del_resp.json()["status"] == "ok"
+
+
+# =============================================================================
+# FLEXIBLE AUTH FOR PDF RESUME DELIVERY TESTS
+# =============================================================================
+
+def test_resume_pdf_flexible_auth_bearer(client: TestClient):
+    """Test PDF export with valid Authorization Bearer header -> 200."""
+    c_resp = client.post("/api/v1/demo/switch-role", json={"role": "candidate_with_fsp"})
+    assert c_resp.status_code == 200
+    cand_token = c_resp.json()["access_token"]
+    cand_id = c_resp.json()["profile_id"]
+
+    headers = {"Authorization": f"Bearer {cand_token}"}
+    resp = client.get(f"/api/v1/resume-pdf/export-fsp/{cand_id}", headers=headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content.startswith(b"%PDF-")
+
+
+def test_resume_pdf_flexible_auth_query_token(client: TestClient):
+    """Test PDF export with valid ?token query param -> 200."""
+    c_resp = client.post("/api/v1/demo/switch-role", json={"role": "candidate_with_fsp"})
+    assert c_resp.status_code == 200
+    cand_token = c_resp.json()["access_token"]
+    cand_id = c_resp.json()["profile_id"]
+
+    # 1. export-fsp with query param token
+    resp_exp = client.get(f"/api/v1/resume-pdf/export-fsp/{cand_id}?token={cand_token}")
+    assert resp_exp.status_code == 200
+    assert resp_exp.headers["content-type"] == "application/pdf"
+    assert resp_exp.content.startswith(b"%PDF-")
+
+    # 2. anonymized with query param token
+    resp_anon = client.get(f"/api/v1/resume-pdf/{cand_id}/anonymized?token={cand_token}")
+    assert resp_anon.status_code == 200
+    assert resp_anon.content.startswith(b"%PDF-")
+
+    # 3. preview-export with query param token
+    resp_prev = client.get(f"/api/v1/resume-pdf/preview-export?token={cand_token}")
+    assert resp_prev.status_code == 200
+    assert resp_prev.content.startswith(b"%PDF-")
+
+
+def test_resume_pdf_flexible_auth_demo_bypass(client: TestClient):
+    """Test PDF export without token when DEMO_BYPASS_ENABLED=True -> 200."""
+    # Ensure profile exists
+    c_resp = client.post("/api/v1/demo/switch-role", json={"role": "candidate_with_fsp"})
+    assert c_resp.status_code == 200
+    cand_id = c_resp.json()["profile_id"]
+
+    orig = settings.DEMO_BYPASS_ENABLED
+    try:
+        settings.DEMO_BYPASS_ENABLED = True
+
+        # Calling without any Authorization header or query token
+        resp_exp = client.get(f"/api/v1/resume-pdf/export-fsp/{cand_id}")
+        assert resp_exp.status_code == 200
+        assert resp_exp.headers["content-type"] == "application/pdf"
+        assert resp_exp.content.startswith(b"%PDF-")
+
+        resp_anon = client.get(f"/api/v1/resume-pdf/{cand_id}/anonymized")
+        assert resp_anon.status_code == 200
+        assert resp_anon.content.startswith(b"%PDF-")
+    finally:
+        settings.DEMO_BYPASS_ENABLED = orig
+
+
+def test_resume_pdf_flexible_auth_invalid_token_never_falls_back_to_demo(client: TestClient):
+    """Test PDF export with invalid token -> 401 (must NEVER fall back to demo mode)."""
+    c_resp = client.post("/api/v1/demo/switch-role", json={"role": "candidate_with_fsp"})
+    assert c_resp.status_code == 200
+    cand_id = c_resp.json()["profile_id"]
+
+    orig = settings.DEMO_BYPASS_ENABLED
+    try:
+        # Even when DEMO_BYPASS_ENABLED is True, invalid token must return 401
+        settings.DEMO_BYPASS_ENABLED = True
+
+        # 1. Invalid Bearer header
+        resp_bad_header = client.get(
+            f"/api/v1/resume-pdf/export-fsp/{cand_id}",
+            headers={"Authorization": "Bearer malformed.invalid.token"},
+        )
+        assert resp_bad_header.status_code == 401
+        assert any(k.lower() == "www-authenticate" for k in resp_bad_header.headers)
+
+        # 2. Invalid query parameter token
+        resp_bad_query = client.get(
+            f"/api/v1/resume-pdf/export-fsp/{cand_id}?token=malformed_token_12345"
+        )
+        assert resp_bad_query.status_code == 401
+        assert any(k.lower() == "www-authenticate" for k in resp_bad_query.headers)
+
+        # 3. When DEMO_BYPASS_ENABLED is False, no token at all also returns 401
+        settings.DEMO_BYPASS_ENABLED = False
+        resp_no_token = client.get(f"/api/v1/resume-pdf/export-fsp/{cand_id}")
+        assert resp_no_token.status_code == 401
+        assert any(k.lower() == "www-authenticate" for k in resp_no_token.headers)
+    finally:
+        settings.DEMO_BYPASS_ENABLED = orig
+
+
+def test_resume_pdf_flexible_auth_mode_b_full_152_fz_privacy_barrier(client: TestClient):
+    """Test Mode B /full without contact access -> 403 (verifying 152-ФЗ check remains active)."""
+    # 1. Setup candidate
+    c_resp = client.post("/api/v1/demo/switch-role", json={"role": "candidate_with_fsp"})
+    assert c_resp.status_code == 200
+    cand_id = c_resp.json()["profile_id"]
+
+    # 2. Setup employer who has not sent accepted invitation
+    emp_resp = client.post("/api/v1/demo/switch-role", json={"role": "employer"})
+    assert emp_resp.status_code == 200
+    emp_token = emp_resp.json()["access_token"]
+
+    # 2a. Employer accesses full PDF via Bearer header -> 403
+    resp_full_header = client.get(
+        f"/api/v1/resume-pdf/{cand_id}/full",
+        headers={"Authorization": f"Bearer {emp_token}"},
+    )
+    assert resp_full_header.status_code == 403
+    assert "152-ФЗ" in resp_full_header.json()["detail"]
+
+    # 2b. Employer accesses full PDF via query token -> 403
+    resp_full_query = client.get(
+        f"/api/v1/resume-pdf/{cand_id}/full?token={emp_token}"
+    )
+    assert resp_full_query.status_code == 403
+    assert "152-ФЗ" in resp_full_query.json()["detail"]
+
+    # 2c. Employer accesses export-fsp with mode_b_full via query token -> 403
+    resp_exp_b = client.get(
+        f"/api/v1/resume-pdf/export-fsp/{cand_id}?mode=mode_b_full&token={emp_token}"
+    )
+    assert resp_exp_b.status_code == 403
+    assert "152-ФЗ" in resp_exp_b.json()["detail"]
 

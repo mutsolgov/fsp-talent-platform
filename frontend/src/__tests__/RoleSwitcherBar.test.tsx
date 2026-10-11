@@ -22,7 +22,7 @@ describe('RoleSwitcherBar Molecule & Jury Persona Fast-Switching', () => {
 
       expect(html).toContain('role="toolbar"');
       expect(html).toContain('aria-label="Панель переключения демо-ролей жюри"');
-      expect(html).toContain('Демо Жюри:');
+      expect(html).not.toContain('Демо Жюри:');
     });
 
     it('applies fixed floating positioning when isFloating prop is true', () => {

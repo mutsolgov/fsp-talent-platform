@@ -9,28 +9,91 @@ import { RadarMatchChart } from '../components/molecules/RadarMatchChart';
 import { User, Mail, ShieldCheck, Trophy, Sparkles, FileText, Code, Check, AlertCircle } from '../components/icons';
 import { api } from '../api/client';
 
-export const CandidateProfilePage: React.FC = () => {
-  const [candidate, setCandidate] = useState<{
-    id: number;
-    fullName: string;
-    specialization: string;
-    verifiedGrade: string;
-    fspId: string | null;
-    sportRank: any;
-    isFspVerified: boolean;
-    theta: number;
-    freshnessScore: number;
-    cooldownUntil: string | null;
-    skills: string[];
-    maskedCode: string;
-    bio: string;
-    is_published: boolean;
-  } | null>(null);
+export interface CandidateDataModel {
+  id: number;
+  fullName: string;
+  specialization: string;
+  verifiedGrade: string;
+  fspId: string | null;
+  sportRank: string;
+  isFspVerified: boolean;
+  theta: number;
+  freshnessScore: number;
+  cooldownUntil: string | null;
+  skills: string[];
+  maskedCode: string;
+  bio: string;
+  is_published: boolean;
+}
 
-  const [isLoading, setIsLoading] = useState(true);
+export interface CandidateProfilePageProps {
+  initialData?: any;
+  initialCandidate?: CandidateDataModel;
+}
+
+export function mapCandidateProfileData(data: any): CandidateDataModel {
+  const fullName =
+    data.first_name && data.last_name
+      ? `${data.first_name} ${data.last_name}`
+      : data.first_name || data.last_name || data.fullName || 'Кандидат ФСП';
+
+  const skills = Array.isArray(data.skills)
+    ? data.skills.map((s: any) => (typeof s === 'string' ? s : s.skill_name || s.name || ''))
+    : [];
+
+  const thetaScore = Number(data.kite_score_scaled ?? data.theta ?? 0);
+  const bio = data.bio || data.about || '';
+
+  const verifiedGrade =
+    data.grade && data.grade !== 'Не определен'
+      ? data.grade
+      : (data.verified_grade || 'Ожидает тестирования');
+
+  const specialization =
+    data.specialization && data.specialization !== 'Не выбрана'
+      ? data.specialization
+      : 'Специализация не выбрана';
+
+  const sportRank = data.fsp_id
+    ? (data.sport_rank || data.fsp_badge || '1-й разряд')
+    : 'Без разряда';
+
+  const isFspVerified = Boolean(
+    data.fsp_id && (data.fsp_verified || data.is_fsp_verified)
+  );
+
+  return {
+    id: data.id || 1,
+    fullName,
+    skills,
+    verifiedGrade,
+    specialization,
+    fspId: data.fsp_id || null,
+    sportRank,
+    isFspVerified,
+    theta: thetaScore,
+    freshnessScore: Number(data.freshness_score ?? 50),
+    cooldownUntil: data.cooldown_until || null,
+    maskedCode: data.maskedCode || `CAND-77-${String(data.id || 1).padStart(4, '0')}`,
+    bio,
+    is_published: Boolean(data.is_published),
+  };
+}
+
+export const CandidateProfilePage: React.FC<CandidateProfilePageProps> = ({
+  initialData,
+  initialCandidate,
+}) => {
+  const [candidate, setCandidate] = useState<CandidateDataModel | null>(() => {
+    if (initialCandidate) return initialCandidate;
+    if (initialData) return mapCandidateProfileData(initialData);
+    return null;
+  });
+
+  const [isLoading, setIsLoading] = useState(!initialCandidate && !initialData);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [bioText, setBioText] = useState('');
+  const [bioText, setBioText] = useState(candidate ? candidate.bio : '');
   const [isSavingBio, setIsSavingBio] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -38,38 +101,15 @@ export const CandidateProfilePage: React.FC = () => {
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const fetchProfile = async () => {
+    if (initialCandidate || initialData) return;
     setIsLoading(true);
     setError(null);
     try {
       const data = await api.get<any>('/candidate-profile/me');
       if (data) {
-        const fullName =
-          data.first_name && data.last_name
-            ? `${data.first_name} ${data.last_name}`
-            : data.first_name || data.last_name || data.fullName || 'Кандидат ФСП';
-        const skills = Array.isArray(data.skills)
-          ? data.skills.map((s: any) => (typeof s === 'string' ? s : s.skill_name || s.name || ''))
-          : [];
-        const thetaScore = Number(data.kite_score_scaled ?? data.theta ?? 0);
-        const bio = data.bio || data.about || '';
-        setBioText(bio);
-
-        setCandidate({
-          id: data.id || 1,
-          fullName,
-          skills,
-          verifiedGrade: data.grade || data.verified_grade || 'Middle',
-          specialization: data.specialization || 'Backend',
-          fspId: data.fsp_id || null,
-          sportRank: data.fsp_badge || '1Р',
-          isFspVerified: Boolean(data.fsp_id || data.fsp_verified || data.is_fsp_verified),
-          theta: thetaScore,
-          freshnessScore: Number(data.freshness_score ?? 50),
-          cooldownUntil: data.cooldown_until || null,
-          maskedCode: data.maskedCode || `CAND-77-${String(data.id || 1).padStart(4, '0')}`,
-          bio,
-          is_published: Boolean(data.is_published),
-        });
+        const mapped = mapCandidateProfileData(data);
+        setBioText(mapped.bio);
+        setCandidate(mapped);
       }
     } catch (err: unknown) {
       setError(
@@ -183,7 +223,7 @@ export const CandidateProfilePage: React.FC = () => {
                 <FspRankBadge
                   rank={candidate.sportRank}
                   isFspVerified={candidate.isFspVerified}
-                  contestCount={6}
+                  contestCount={candidate.fspId ? 6 : undefined}
                 />
               </div>
             </div>
@@ -218,12 +258,27 @@ export const CandidateProfilePage: React.FC = () => {
               {/* KITE Theta */}
               <div className="p-5 bg-[#202129] rounded-[12px] border border-[#2D2E37] flex flex-col justify-between">
                 <span className="text-xs font-mono text-[#9B9C9E]">Балл KITE IRT:</span>
-                <div className="font-mono text-2xl font-bold text-white my-1">
-                  θ = {candidate.theta} <span className="text-xs text-[#00F5D4]">/ 100</span>
-                </div>
-                <span className="text-[11px] text-[#9B9C9E]">
-                  Верифицировано независимой психометрикой
-                </span>
+                {!candidate.theta || candidate.theta === 0 ? (
+                  <div className="my-1 flex flex-col gap-2">
+                    <div className="font-mono text-sm font-bold text-[#9B9C9E]">
+                      Тестирование не пройдено
+                    </div>
+                    <a href="/candidate/assessment" className="mt-1">
+                      <Button variant="fsp_mint" size="sm" className="w-full">
+                        <span>Пройти калибровку</span>
+                      </Button>
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    <div className="font-mono text-2xl font-bold text-white my-1">
+                      θ = {candidate.theta} <span className="text-xs text-[#00F5D4]">/ 100</span>
+                    </div>
+                    <span className="text-[11px] text-[#9B9C9E]">
+                      Верифицировано независимой психометрикой
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Cooldown Timer */}
@@ -292,24 +347,40 @@ export const CandidateProfilePage: React.FC = () => {
                   <span className="text-xs text-[#9B9C9E] font-mono">{candidate.skills.length} навыков</span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {candidate.skills.map((skill, idx) => (
-                    <span
-                      key={idx}
-                      className="px-3 py-1.5 rounded-[8px] text-xs font-mono bg-[#1B1C21] border border-[#2D2E37] text-white flex items-center gap-1.5"
-                    >
-                      <Check size={12} className="text-[#00F5D4]" />
-                      <span>{skill}</span>
-                    </span>
-                  ))}
-                </div>
+                {candidate.skills.length === 0 ? (
+                  <div className="p-5 bg-[#1B1C21] rounded-[12px] border border-[#2D2E37] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle size={20} className="text-[#00F5D4] shrink-0 mt-0.5" />
+                      <p className="text-xs text-[#C8C9CA] font-mono leading-relaxed">
+                        Технологический стек пока не заполнен. Заполните анкету онбординга или загрузите резюме, чтобы добавить подтвержденные навыки
+                      </p>
+                    </div>
+                    <a href="/candidate/onboarding" className="shrink-0 w-full sm:w-auto">
+                      <Button variant="fsp_mint" size="sm" className="w-full">
+                        <span>Заполнить анкету</span>
+                      </Button>
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {candidate.skills.map((skill, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1.5 rounded-[8px] text-xs font-mono bg-[#1B1C21] border border-[#2D2E37] text-white flex items-center gap-1.5"
+                      >
+                        <Check size={12} className="text-[#00F5D4]" />
+                        <span>{skill}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-[#2D2E37]">
                   <h3 className="font-mono text-xs font-bold text-white mb-2">Многофакторное позиционирование:</h3>
                   <div className="flex justify-center py-2">
                     <RadarMatchChart
-                      testMatch={candidate.theta}
-                      stackMatch={90}
+                      testMatch={candidate.theta || 0}
+                      stackMatch={candidate.skills.length > 0 ? 90 : 0}
                       fspMatch={candidate.isFspVerified ? 80 : 0}
                       freshnessMatch={candidate.freshnessScore}
                       isFspProfile={candidate.isFspVerified}

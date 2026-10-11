@@ -28,10 +28,12 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, className 
           <a href="/categories" className="hover:text-[#402FFF] transition-colors">
             24 Категории
           </a>
-          <a href="/demo/dashboard" className="text-[#402FFF] font-bold flex items-center gap-1 hover:underline">
-            <ShieldCheck size={14} />
-            Демо Жюри
-          </a>
+          {Boolean(import.meta.env?.VITE_ENABLE_DEMO_BAR === 'true') && (
+            <a href="/demo/dashboard" className="text-[#402FFF] font-bold flex items-center gap-1 hover:underline">
+              <ShieldCheck size={14} />
+              Демо Жюри
+            </a>
+          )}
         </nav>
 
         <div className="flex items-center gap-3">
@@ -71,7 +73,9 @@ export const PublicLayout: React.FC<PublicLayoutProps> = ({ children, className 
             <a href="/categories" className="hover:text-white">Категории</a>
             <a href="/candidate/onboarding" className="hover:text-white">Соискателям</a>
             <a href="/employer/candidate-bank" className="hover:text-white">Работодателям</a>
-            <a href="/demo/dashboard" className="text-[#00F5D4] hover:underline">Режим Жюри</a>
+            {Boolean(import.meta.env?.VITE_ENABLE_DEMO_BAR === 'true') && (
+              <a href="/demo/dashboard" className="text-[#00F5D4] hover:underline">Режим Жюри</a>
+            )}
           </div>
 
           <div className="text-[11px] text-[#5F5F66] text-center md:text-right">

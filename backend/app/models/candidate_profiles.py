@@ -46,9 +46,9 @@ class CandidateProfile(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     telegram: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     github_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    city: Mapped[str] = mapped_column(String(100), server_default=sa.text("'Москва'"), default="Москва", nullable=False)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default=None)
     relocation_ready: Mapped[bool] = mapped_column(Boolean, server_default=sa.text("false"), default=False, nullable=False)
-    work_format: Mapped[str] = mapped_column(String(64), server_default=sa.text("'remote'"), default="remote", nullable=False)
+    work_format: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None)
     expected_salary: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     raw_resume_pdf_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -67,7 +67,7 @@ class CandidateProfile(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_candidate_profiles_user"),
-        CheckConstraint("work_format IN ('remote', 'office', 'hybrid', 'any')", name="chk_candidate_work_format"),
+        CheckConstraint("work_format IS NULL OR work_format IN ('remote', 'office', 'hybrid', 'any')", name="chk_candidate_work_format"),
         CheckConstraint("expected_salary IS NULL OR expected_salary > 0", name="chk_candidate_salary"),
         CheckConstraint("freshness_score >= 0.0 AND freshness_score <= 100.0", name="chk_candidate_freshness"),
     )

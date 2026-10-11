@@ -30,7 +30,7 @@ def test_eval_theta_below_70_no_forced_downgrade():
 
 
 def test_eval_theta_standard_confirmation_70_to_88():
-    """70 <= theta < 88: подтверждение заявленного грейда и запуск 90-дневного кулдауна."""
+    """70 <= theta < 88: подтверждение заявленного грейда и запуск 30-дневного кулдауна."""
     now = datetime(2026, 4, 1, 12, 0, tzinfo=timezone.utc)
     res = GradingEngine.evaluate_session(
         candidate_id=2,
@@ -45,7 +45,8 @@ def test_eval_theta_standard_confirmation_70_to_88():
     assert res["confirmed_grade"] == "Middle"
     assert res["boost_offered"] is False
     assert res["retest_lower_offered"] is False
-    expected_cooldown = now + timedelta(days=90)
+    assert GradingEngine.COOLDOWN_DAYS == 30
+    expected_cooldown = now + timedelta(days=GradingEngine.COOLDOWN_DAYS)
     assert res["cooldown_until"] == expected_cooldown
 
 
@@ -131,7 +132,7 @@ def test_cooldown_blocks_same_or_higher_grade():
         now=now,
     )
     assert allowed is False
-    assert "90-дневный кулдаун" in msg
+    assert f"{GradingEngine.COOLDOWN_DAYS}-дневный кулдаун" in msg
 
     # Попытка сдачи на Senior (выше)
     allowed, msg = GradingEngine.check_cooldown(

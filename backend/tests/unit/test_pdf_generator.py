@@ -100,3 +100,57 @@ def test_generate_pdf_non_fsp_candidate_fallback():
     assert isinstance(pdf_bytes, bytes)
     assert len(pdf_bytes) > 2000
     assert pdf_bytes.startswith(b"%PDF-")
+
+
+def test_generate_pdf_uncalibrated_candidate_without_defaults():
+    """Проверка генерации PDF для нового неоткалиброванного соискателя без синтетических заглушек."""
+    candidate_data = {
+        "id": 9999,
+        "first_name": "Федор",
+        "last_name": "Федотов",
+        "specialization": None,
+        "grade": None,
+        "theta": None,
+        "fsp_id": None,
+        "fsp_verified": False,
+        "sport_rank": None,
+        "skills": [],
+        "city": None,
+        "work_format": None,
+        "expected_salary": None,
+        "fsp_achievements": [],
+    }
+
+    # Генерация должна пройти успешно без TypeError и выдать валидный PDF
+    pdf_bytes = generate_fsp_profile_pdf(candidate_data, is_full_mode=False)
+
+    assert isinstance(pdf_bytes, bytes)
+    assert len(pdf_bytes) > 2000
+    assert pdf_bytes.startswith(b"%PDF-")
+
+
+def test_generate_pdf_uncalibrated_string_markers():
+    """Проверка генерации PDF при явных маркерах 'Не выбрана' и 'Не определен'."""
+    candidate_data = {
+        "id": 9998,
+        "first_name": "Иван",
+        "last_name": "Иванов",
+        "specialization": "Не выбрана",
+        "grade": "Не определен",
+        "theta": 0.0,
+        "fsp_id": None,
+        "fsp_verified": False,
+        "sport_rank": None,
+        "skills": [],
+        "city": None,
+        "work_format": None,
+        "expected_salary": None,
+        "fsp_achievements": [],
+    }
+
+    pdf_bytes = generate_fsp_profile_pdf(candidate_data, is_full_mode=False)
+
+    assert isinstance(pdf_bytes, bytes)
+    assert len(pdf_bytes) > 2000
+    assert pdf_bytes.startswith(b"%PDF-")
+

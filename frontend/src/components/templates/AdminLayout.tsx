@@ -29,9 +29,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, className = 
               <a href="/admin/analytics" className="hover:text-white">
                 Аналитика
               </a>
-              <a href="/demo/dashboard" className="hover:text-[#00F5D4]">
-                Демо Жюри
-              </a>
+              {Boolean(import.meta.env?.VITE_ENABLE_DEMO_BAR === 'true') && (
+                <a href="/demo/dashboard" className="hover:text-[#00F5D4]">
+                  Демо Жюри
+                </a>
+              )}
             </nav>
             <RoleSwitcherBar />
           </div>

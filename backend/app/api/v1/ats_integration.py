@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.v1.auth import get_current_user
 from app.database import get_db
 from app.models.ats_integrations import AtsIntegration
+from app.models.audit_logs import AuditLog
 from app.models.candidate_profiles import CandidateProfile
 from app.models.employer_profiles import EmployerProfile
 from app.models.grades import Grade
@@ -193,6 +194,23 @@ async def _resolve_candidate_for_export(
     cand = (await db.execute(cand_stmt)).scalar_one_or_none()
     if not cand:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Кандидат не найден")
+
+    # Record 152-ФЗ audit log for unmasked ATS export
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="EXPORT_ATS_UNMASKED_152FZ",
+        entity_type="candidate_profile",
+        entity_id=str(cand.id),
+        payload_json={
+            "candidate_id": cand.id,
+            "employer_id": employer.id,
+            "company_name": employer.company_name,
+        },
+        ip_address="127.0.0.1",
+        user_agent="FSP Platform ATS Integration",
+    )
+    db.add(audit)
+    await db.commit()
 
     email = cand.user.email if hasattr(cand, "user") and cand.user else f"candidate_{cand.id}@fsp.ru"
     skills = [cs.skill.name for cs in cand.candidate_skills if cs.skill] if cand.candidate_skills else ["Python", "FastAPI"]

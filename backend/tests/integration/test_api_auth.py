@@ -29,6 +29,7 @@ from app.models.specializations import Specialization
 from app.models.users import User
 from app.models.user_consents import UserConsent
 from app.models.audit_logs import AuditLog
+from app.models.candidate_profiles import CandidateProfile
 from scripts.seed_reference_data import seed_reference_data
 from fastapi.testclient import TestClient
 
@@ -442,3 +443,271 @@ def test_logout(client):
     res = client.post("/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
+
+
+def test_consents_upsert_when_not_exists(client):
+    """UPSERT для PUT /auth/consents: если запись в user_consents отсутствует, создается новая."""
+    reg_payload = {
+        "email": "upsert.consent@example.com",
+        "password": "Password12345",
+        "role": "candidate",
+        "first_name": "Игорь",
+        "last_name": "Николаев",
+        "consent_pdn_processing": True,
+    }
+    reg_res = client.post("/api/v1/auth/register", json=reg_payload)
+    assert reg_res.status_code == 201
+    user_id = reg_res.json()["user_id"]
+    token = reg_res.json()["tokens"]["access_token"]
+
+    # Удаляем запись согласия из БД, симулируя ее отсутствие
+    async def _delete_consent():
+        async with test_session_factory() as session:
+            await session.execute(text("DELETE FROM user_consents WHERE user_id = :uid"), {"uid": user_id})
+            await session.commit()
+
+    asyncio.run(_delete_consent())
+
+    # PUT /consents должен создать запись (UPSERT), а не вернуть 404
+    put_res = client.put(
+        "/api/v1/auth/consents",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"consent_profile_publication": True, "consent_pdn_processing": True},
+    )
+    assert put_res.status_code == 200, f"Expected 200, got {put_res.status_code}: {put_res.text}"
+    data = put_res.json()
+    assert data["user_id"] == user_id
+    assert data["consent_pdn_processing"] is True
+    assert data["consent_profile_publication"] is True
+    assert data["revoked_at"] is None
+
+    # Проверяем, что запись действительно появилась в БД и зафиксирован аудит
+    async def _verify():
+        async with test_session_factory() as session:
+            res = await session.execute(select(UserConsent).where(UserConsent.user_id == user_id))
+            consent = res.scalar_one_or_none()
+            assert consent is not None
+            assert consent.consent_pdn_processing is True
+            assert consent.consent_profile_publication is True
+
+            res_audit = await session.execute(
+                select(AuditLog).where(AuditLog.user_id == user_id, AuditLog.action == "UPDATE_CONSENT")
+            )
+            audit = res_audit.scalar_one_or_none()
+            assert audit is not None
+
+    asyncio.run(_verify())
+
+    # Также проверяем обновление только одного поля
+    put_res2 = client.put(
+        "/api/v1/auth/consents",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"consent_profile_publication": False},
+    )
+    assert put_res2.status_code == 200
+    data2 = put_res2.json()
+    assert data2["consent_profile_publication"] is False
+    assert data2["revoked_at"] is not None
+
+
+def test_consents_revoke(client):
+    """POST /auth/consents/revoke (ст. 21 152-ФЗ РФ): фиксирует отзыв согласий, скрывает профиль, логирует REVOKE_CONSENT."""
+    reg_payload = {
+        "email": "revoke.consent@example.com",
+        "password": "Password12345",
+        "role": "candidate",
+        "first_name": "Ольга",
+        "last_name": "Соколова",
+        "consent_pdn_processing": True,
+        "consent_profile_publication": True,
+    }
+    reg_res = client.post("/api/v1/auth/register", json=reg_payload)
+    assert reg_res.status_code == 201
+    user_id = reg_res.json()["user_id"]
+    token = reg_res.json()["tokens"]["access_token"]
+
+    # Создаем CandidateProfile с is_published=True
+    async def _create_profile():
+        async with test_session_factory() as session:
+            profile = CandidateProfile(
+                user_id=user_id,
+                first_name="Ольга",
+                last_name="Соколова",
+                city="Москва",
+                work_format="remote",
+                is_published=True,
+            )
+            session.add(profile)
+            await session.commit()
+
+    asyncio.run(_create_profile())
+
+    # Отзыв согласий
+    revoke_res = client.post("/api/v1/auth/consents/revoke", headers={"Authorization": f"Bearer {token}"})
+    assert revoke_res.status_code == 200, f"Expected 200, got {revoke_res.status_code}: {revoke_res.text}"
+    data = revoke_res.json()
+    assert data["consent_pdn_processing"] is False
+    assert data["consent_profile_publication"] is False
+    assert data["revoked_at"] is not None
+
+    # Проверяем в БД: профиль скрыт (is_published=False) и действие залогировано
+    async def _verify_revoke():
+        async with test_session_factory() as session:
+            res_prof = await session.execute(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
+            prof = res_prof.scalar_one_or_none()
+            assert prof is not None
+            assert prof.is_published is False
+
+            res_audit = await session.execute(
+                select(AuditLog).where(AuditLog.user_id == user_id, AuditLog.action == "REVOKE_CONSENT")
+            )
+            audit = res_audit.scalar_one_or_none()
+            assert audit is not None
+
+    asyncio.run(_verify_revoke())
+
+
+def test_export_archive(client):
+    """GET /auth/export-archive (ст. 14 152-ФЗ РФ): выгрузка персональных данных в виде машиночитаемого архива."""
+    reg_payload = {
+        "email": "export.archive@example.com",
+        "password": "Password12345",
+        "role": "candidate",
+        "first_name": "Дмитрий",
+        "last_name": "Кузнецов",
+        "consent_pdn_processing": True,
+        "consent_profile_publication": True,
+    }
+    reg_res = client.post("/api/v1/auth/register", json=reg_payload)
+    token = reg_res.json()["tokens"]["access_token"]
+    user_id = reg_res.json()["user_id"]
+
+    # Создаем CandidateProfile
+    async def _create_profile():
+        async with test_session_factory() as session:
+            profile = CandidateProfile(
+                user_id=user_id,
+                first_name="Дмитрий",
+                last_name="Кузнецов",
+                city="Санкт-Петербург",
+                work_format="remote",
+                is_published=True,
+            )
+            session.add(profile)
+            await session.commit()
+
+    asyncio.run(_create_profile())
+
+    export_res = client.get("/api/v1/auth/export-archive", headers={"Authorization": f"Bearer {token}"})
+    assert export_res.status_code == 200
+    assert 'attachment; filename="fsp_user_archive_152fz.json"' in export_res.headers.get("content-disposition", "")
+    assert "application/json" in export_res.headers.get("content-type", "")
+
+    data = export_res.json()
+    assert "metadata" in data
+    assert "Статья 14" in data["metadata"]["legal_basis"]
+    assert "user" in data
+    assert data["user"]["email"] == "export.archive@example.com"
+    assert "consents" in data
+    assert "profile" in data
+    assert data["profile"]["first_name"] == "Дмитрий"
+    assert "skills" in data
+    assert "assessment_sessions" in data
+    assert "applications" in data
+    assert "invitations" in data
+    assert "audit_trail" in data
+
+
+def test_onboarding_survey_mandatory_pdn_consent(client):
+    """POST /candidate-profile/onboarding-survey: отказ без согласия на обработку ПДн (HTTP 400)."""
+    reg_payload = {
+        "email": "onboarding.consent@example.com",
+        "password": "Password12345",
+        "role": "candidate",
+        "first_name": "Валерий",
+        "last_name": "Морозов",
+        "consent_pdn_processing": True,
+        "consent_profile_publication": True,
+    }
+    reg_res = client.post("/api/v1/auth/register", json=reg_payload)
+    token = reg_res.json()["tokens"]["access_token"]
+
+    survey_payload = {
+        "specialization_id": 1,
+        "claimed_grade_id": 1,
+        "skills": ["Python", "FastAPI"],
+        "city": "Москва",
+        "work_format": "remote",
+        "consent_personal_data": False,
+    }
+
+    resp_fail = client.post(
+        "/api/v1/candidate-profile/onboarding-survey",
+        json=survey_payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp_fail.status_code == 400
+    assert resp_fail.json()["detail"] == "Согласие на обработку персональных данных (152-ФЗ) обязательно"
+
+    # С consent_personal_data=True онбординг проходит успешно
+    survey_payload["consent_personal_data"] = True
+    resp_ok = client.post(
+        "/api/v1/candidate-profile/onboarding-survey",
+        json=survey_payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp_ok.status_code == 201
+
+
+def test_admin_audit_logs_rbac_and_content(client):
+    """GET /admin/audit-logs: проверка RBAC (403 для candidate, 200 для admin) и структуры записей."""
+    # 1. Register candidate and verify 403 Forbidden
+    reg_cand = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "cand.audit.rbac@example.com",
+            "password": "Password12345",
+            "role": "candidate",
+            "first_name": "Иван",
+            "last_name": "Тестов",
+            "consent_pdn_processing": True,
+            "consent_profile_publication": True,
+        },
+    )
+    cand_token = reg_cand.json()["tokens"]["access_token"]
+    resp_cand = client.get("/api/v1/admin/audit-logs", headers={"Authorization": f"Bearer {cand_token}"})
+    assert resp_cand.status_code == 403
+
+    # 2. Register admin and verify 200 OK
+    reg_admin = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "admin.audit.rbac@example.com",
+            "password": "Password12345",
+            "role": "admin",
+            "first_name": "Админ",
+            "last_name": "Главный",
+            "consent_pdn_processing": True,
+            "consent_profile_publication": True,
+        },
+    )
+    admin_token = reg_admin.json()["tokens"]["access_token"]
+    resp_admin = client.get("/api/v1/admin/audit-logs", headers={"Authorization": f"Bearer {admin_token}"})
+    assert resp_admin.status_code == 200
+    data = resp_admin.json()
+    assert "items" in data
+    assert "meta" in data
+    assert isinstance(data["items"], list)
+
+    # 3. GET /admin/users should return registered users list
+    resp_users = client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {admin_token}"})
+    assert resp_users.status_code == 200
+    data_users = resp_users.json()
+    assert "items" in data_users
+    assert len(data_users["items"]) > 0
+    first_u = data_users["items"][0]
+    assert "email" in first_u
+    assert "role" in first_u
+    assert "is_pdn_consent_given" in first_u
+
+

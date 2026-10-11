@@ -24,6 +24,7 @@ process.env.NODE_PATH = [localVendorDir, localNodeModules, npxVendorDir, process
 
 const require = createRequire(import.meta.url);
 require('module').Module._initPaths();
+process.env.VITE_ENABLE_DEMO_BAR = 'true';
 
 // -----------------------------------------------------------------------------
 // 1. Setup DOM & Browser Global Mocks for Offline SSR & State Tests
@@ -177,7 +178,8 @@ try {
 }
 
 require.extensions['.ts'] = (module, filename) => {
-  const content = fs.readFileSync(filename, 'utf8');
+  let content = fs.readFileSync(filename, 'utf8');
+  content = content.replace(/import\.meta\.env/g, 'process.env');
   const compiled = sucrase.transform(content, {
     transforms: ['typescript', 'imports'],
     filePath: filename,
@@ -186,7 +188,8 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 require.extensions['.tsx'] = (module, filename) => {
-  const content = fs.readFileSync(filename, 'utf8');
+  let content = fs.readFileSync(filename, 'utf8');
+  content = content.replace(/import\.meta\.env/g, 'process.env');
   const compiled = sucrase.transform(content, {
     transforms: ['typescript', 'jsx', 'imports'],
     filePath: filename,

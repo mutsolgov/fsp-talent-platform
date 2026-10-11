@@ -59,6 +59,12 @@ async def submit_onboarding_survey(
             detail="Только соискатели могут заполнять анкету онбординга",
         )
 
+    if not payload.consent_personal_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Согласие на обработку персональных данных (152-ФЗ) обязательно",
+        )
+
     # 1. Валидация специализации и заявляемого грейда
     spec = await db.scalar(select(Specialization).where(Specialization.id == payload.specialization_id))
     if not spec:
@@ -204,7 +210,14 @@ async def get_my_profile(
         select(CandidateProfile)
         .options(
             selectinload(CandidateProfile.candidate_skills).selectinload(CandidateSkill.skill),
-            selectinload(CandidateProfile.candidate_categorizations),
+            selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.category)
+                .selectinload(Category.specialization),
+            selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.category)
+                .selectinload(Category.grade),
+            selectinload(CandidateProfile.candidate_categorizations)
+                .selectinload(CandidateCategorization.confirmed_grade),
         )
         .where(CandidateProfile.user_id == current_user.id)
     )
@@ -215,8 +228,8 @@ async def get_my_profile(
             user_id=current_user.id,
             first_name="Соискатель",
             last_name="ФСП",
-            city="Москва",
-            work_format="remote",
+            city=None,
+            work_format=None,
             freshness_score=50.0,
             is_published=True,
         )
@@ -226,7 +239,14 @@ async def get_my_profile(
             select(CandidateProfile)
             .options(
                 selectinload(CandidateProfile.candidate_skills).selectinload(CandidateSkill.skill),
-                selectinload(CandidateProfile.candidate_categorizations),
+                selectinload(CandidateProfile.candidate_categorizations)
+                    .selectinload(CandidateCategorization.category)
+                    .selectinload(Category.specialization),
+                selectinload(CandidateProfile.candidate_categorizations)
+                    .selectinload(CandidateCategorization.category)
+                    .selectinload(Category.grade),
+                selectinload(CandidateProfile.candidate_categorizations)
+                    .selectinload(CandidateCategorization.confirmed_grade),
             )
             .where(CandidateProfile.id == profile.id)
         )
@@ -246,14 +266,44 @@ async def get_my_profile(
         )
 
     survey = profile.survey_data_json or {}
-    spec_code = survey.get("specialization_code", "Backend").capitalize()
-    grade_code = survey.get("claimed_grade_code", "Middle").capitalize()
-    sal_min = survey.get("salary_min") or profile.expected_salary
-    sal_max = survey.get("salary_max") or profile.expected_salary
+    curr_cat = next((c for c in getattr(profile, "candidate_categorizations", []) if c.is_current), None)
+
+    if curr_cat:
+        score_scaled = curr_cat.test_score
+        grade_name = (
+            curr_cat.confirmed_grade.name
+            if curr_cat.confirmed_grade
+            else (curr_cat.category.grade.name if curr_cat.category and curr_cat.category.grade else "Не определен")
+        )
+        spec_name = (
+            curr_cat.category.specialization.name
+            if curr_cat.category and curr_cat.category.specialization
+            else "Не выбрана"
+        )
+        cat_title = curr_cat.category.title if curr_cat.category else f"{spec_name} · {grade_name}"
+    elif survey and (survey.get("specialization_code") or survey.get("claimed_grade_code")):
+        score_scaled = 0.0
+        raw_spec = survey.get("specialization_code")
+        raw_grade = survey.get("claimed_grade_code")
+        spec_name = raw_spec.capitalize() if raw_spec else "Не выбрана"
+        grade_name = raw_grade.capitalize() if raw_grade else "Не определен"
+        cat_title = f"{spec_name} · {grade_name}" if (raw_spec and raw_grade) else "Профиль не откалиброван"
+    else:
+        # Новый соискатель с пустой анкетой и без категорий
+        score_scaled = 0.0
+        spec_name = "Не выбрана"
+        grade_name = "Не определен"
+        cat_title = "Профиль не откалиброван"
+
+    sal_min = survey.get("salary_min") if survey.get("salary_min") is not None else profile.expected_salary
+    sal_max = survey.get("salary_max") if survey.get("salary_max") is not None else profile.expected_salary
     about_text = profile.bio
 
-    curr_cat = next((c for c in getattr(profile, "candidate_categorizations", []) if c.is_current), None)
-    score_scaled = curr_cat.test_score if curr_cat else 0.0
+    work_fmt = (
+        WorkFormatEnum(profile.work_format)
+        if profile.work_format and profile.work_format in WorkFormatEnum._value2member_map_
+        else None
+    )
 
     return CandidateFullProfileResponse(
         id=profile.id,
@@ -266,16 +316,16 @@ async def get_my_profile(
         telegram=profile.telegram,
         github_url=profile.github_url,
         city=profile.city,
-        work_format=WorkFormatEnum(profile.work_format) if profile.work_format in WorkFormatEnum._value2member_map_ else WorkFormatEnum.ANY,
+        work_format=work_fmt,
         relocation_ready=profile.relocation_ready,
         expected_salary=profile.expected_salary,
         salary_min=sal_min,
         salary_max=sal_max,
         bio=profile.bio,
         about=about_text,
-        specialization=spec_code,
-        grade=grade_code,
-        category_title=f"{spec_code} · {grade_code}",
+        specialization=spec_name,
+        grade=grade_name,
+        category_title=cat_title,
         skills=skills_items,
         kite_score_scaled=score_scaled,
         theta=score_scaled,
@@ -310,7 +360,10 @@ async def update_my_profile(
             user_id=current_user.id,
             first_name=payload.first_name or "Соискатель",
             last_name=payload.last_name or "ФСП",
-            city=payload.city or "Москва",
+            city=payload.city,
+            work_format=payload.work_format.value if payload.work_format else None,
+            freshness_score=50.0,
+            is_published=True,
         )
         db.add(profile)
         await db.flush()
@@ -341,6 +394,20 @@ async def update_my_profile(
         profile.bio = payload.about
 
     curr_survey = dict(profile.survey_data_json or {})
+    new_min = payload.salary_min if payload.salary_min is not None else curr_survey.get("salary_min")
+    new_max = payload.salary_max if payload.salary_max is not None else curr_survey.get("salary_max")
+    if new_min is not None and new_max is not None:
+        if new_max < new_min:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"salary_max ({new_max}) не может быть меньше salary_min ({new_min}) (ERR_SALARY_MAX_LT_MIN)",
+            )
+        if new_min > 0 and (new_max / new_min) > 3.5:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Разброс зарплатной вилки {new_max / new_min:.2f} превышает 3.5 (ERR_SUSPICIOUS_SALARY_SPREAD)",
+            )
+
     if payload.salary_min is not None:
         curr_survey["salary_min"] = payload.salary_min
         profile.expected_salary = payload.salary_min

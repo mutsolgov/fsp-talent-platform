@@ -124,4 +124,6 @@ class UserConsentResponse(BaseSchema):
 
 
 class UpdateConsentRequest(BaseSchema):
-    consent_profile_publication: bool = Field(..., description="Флаг согласия на распространение ПДн (ст. 10.1)")
+    consent_profile_publication: Optional[bool] = None
+    consent_pdn_processing: Optional[bool] = None
+

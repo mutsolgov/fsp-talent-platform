@@ -59,8 +59,8 @@ class CandidateBankCard(BaseSchema):
     category_badge: str
     test_score: float
     freshness_score: float
-    city: str
-    work_format: str
+    city: Optional[str] = None
+    work_format: Optional[str] = None
     relocation_ready: bool
     expected_salary: Optional[int] = None
     fsp_id: Optional[str] = None
@@ -92,8 +92,8 @@ class CandidateAnonymizedDetailResponse(BaseSchema):
     grade: str
     category_title: str
     bio: Optional[str] = None
-    city: str
-    work_format: str
+    city: Optional[str] = None
+    work_format: Optional[str] = None
     relocation_ready: bool
     expected_salary: Optional[int] = None
     skills: List[str] = Field(default_factory=list)

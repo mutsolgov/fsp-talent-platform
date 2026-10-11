@@ -125,7 +125,7 @@ async function executeTokenRefresh(): Promise<string | null> {
   }
 }
 
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+async function requestRaw(endpoint: string, options: RequestOptions = {}): Promise<Response> {
   const { params, headers = {}, _retry = false, ...rest } = options;
   let url: string;
   if (endpoint.startsWith('http')) {
@@ -173,7 +173,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
         // If another concurrent request already refreshed the token in the meantime, retry immediately
         if (currentAccessToken && initialAccessToken && currentAccessToken !== initialAccessToken) {
-          return await request<T>(endpoint, {
+          return await requestRaw(endpoint, {
             ...options,
             _retry: true,
             headers: {
@@ -192,7 +192,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
           const refreshedToken = await refreshInProgressPromise;
           if (refreshedToken) {
-            return await request<T>(endpoint, {
+            return await requestRaw(endpoint, {
               ...options,
               _retry: true,
               headers: {
@@ -218,14 +218,80 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       throw new ApiError(`HTTP ${response.status}: ${response.statusText}`, response.status, errData);
     }
 
-    if (response.status === 204) {
-      return {} as T;
-    }
-
-    return (await response.json()) as T;
+    return response;
   } catch (err: unknown) {
     if (err instanceof ApiError) throw err;
     throw new ApiError(err instanceof Error ? err.message : 'Network request failed', 0, err);
+  }
+}
+
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  const response = await requestRaw(endpoint, options);
+  if (response.status === 204) {
+    return {} as T;
+  }
+  return (await response.json()) as T;
+}
+
+export async function downloadBlob(
+  endpoint: string,
+  defaultFilename: string = 'document.pdf'
+): Promise<void> {
+  const response = await requestRaw(endpoint, { method: 'GET' });
+  const blob = await response.blob();
+
+  let resolvedFilename = defaultFilename;
+  const disposition = response.headers?.get ? response.headers.get('content-disposition') : null;
+  if (disposition && defaultFilename === 'document.pdf') {
+    const parts = disposition.split(';');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.toLowerCase().startsWith('filename=')) {
+        let rawName = trimmed.slice(9).trim();
+        if ((rawName.startsWith('"') && rawName.endsWith('"')) || (rawName.startsWith("'") && rawName.endsWith("'"))) {
+          rawName = rawName.slice(1, -1);
+        }
+        if (rawName) {
+          resolvedFilename = rawName;
+        }
+        break;
+      }
+    }
+  }
+
+  const createUrl =
+    (typeof window !== 'undefined' && window.URL?.createObjectURL) ||
+    (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' ? URL.createObjectURL : null);
+  const revokeUrl =
+    (typeof window !== 'undefined' && window.URL?.revokeObjectURL) ||
+    (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function' ? URL.revokeObjectURL : null);
+
+  const blobUrl = createUrl ? createUrl(blob) : null;
+
+  try {
+    if (typeof document !== 'undefined') {
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      if (blobUrl) {
+        link.href = blobUrl;
+      }
+      link.download = resolvedFilename;
+      document.body.appendChild(link);
+      if (typeof link.click === 'function') {
+        link.click();
+      }
+      document.body.removeChild(link);
+    }
+  } finally {
+    if (blobUrl && revokeUrl) {
+      setTimeout(() => {
+        try {
+          revokeUrl(blobUrl);
+        } catch {
+          // ignore cleanup errors in test environments
+        }
+      }, 100);
+    }
   }
 }
 
@@ -244,4 +310,6 @@ export const api = {
   patch: <T>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>(url, { ...options, method: 'PATCH', body: serializeBody(body) }),
   delete: <T>(url: string, options?: RequestOptions) => request<T>(url, { ...options, method: 'DELETE' }),
+  downloadBlob: (endpoint: string, defaultFilename: string = 'document.pdf') =>
+    downloadBlob(endpoint, defaultFilename),
 };

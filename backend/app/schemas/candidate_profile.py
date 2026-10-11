@@ -37,10 +37,23 @@ class OnboardingSurveyRequest(BaseSchema):
     expected_salary: Optional[int] = Field(None, gt=0, description="Ожидаемая заработная плата в рублях")
     salary_min: Optional[int] = Field(None, gt=0, description="Минимальная зарплата")
     salary_max: Optional[int] = Field(None, gt=0, description="Максимальная зарплата")
+    salary_currency: Optional[Literal["RUB"]] = Field(default="RUB", description="Валюта заработной платы (строго RUB)")
     consent_personal_data: Optional[bool] = Field(default=True)
     consent_profile_publish: Optional[bool] = Field(default=True)
     bio: Optional[str] = Field(None, max_length=2000)
     about: Optional[str] = Field(None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_salary_bounds(self) -> "OnboardingSurveyRequest":
+        if self.salary_min is not None and self.salary_min <= 0:
+            raise ValueError("salary_min должен быть строго больше нуля (ERR_SALARY_MIN_NOT_POSITIVE)")
+        if self.salary_min is not None and self.salary_max is not None:
+            if self.salary_max < self.salary_min:
+                raise ValueError("salary_max не может быть меньше salary_min (ERR_SALARY_MAX_LT_MIN)")
+            ratio = self.salary_max / self.salary_min
+            if ratio > 3.5:
+                raise ValueError(f"Разброс зарплатной вилки {ratio:.2f} превышает 3.5 (ERR_SUSPICIOUS_SALARY_SPREAD)")
+        return self
 
 
 class OnboardingSurveyResponse(BaseSchema):
@@ -64,19 +77,19 @@ class CandidateFullProfileResponse(BaseSchema):
     phone: Optional[str] = None
     telegram: Optional[str] = None
     github_url: Optional[str] = None
-    city: str
-    work_format: WorkFormatEnum
-    relocation_ready: bool
+    city: Optional[str] = None
+    work_format: Optional[WorkFormatEnum] = None
+    relocation_ready: bool = False
     expected_salary: Optional[int] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     bio: Optional[str] = None
     about: Optional[str] = None
-    specialization: str
-    grade: str
-    category_title: str
-    skills: List[CandidateSkillItem]
-    kite_score_scaled: float
+    specialization: Optional[str] = None
+    grade: Optional[str] = None
+    category_title: Optional[str] = None
+    skills: List[CandidateSkillItem] = []
+    kite_score_scaled: float = 0.0
     theta: Optional[float] = None
     fsp_id: Optional[str] = None
     fsp_verified: bool
@@ -106,8 +119,23 @@ class CandidateProfileUpdateRequest(BaseSchema):
     expected_salary: Optional[int] = Field(None, gt=0)
     salary_min: Optional[int] = Field(None, gt=0)
     salary_max: Optional[int] = Field(None, gt=0)
+    salary_currency: Optional[Literal["RUB"]] = "RUB"
     bio: Optional[str] = Field(None, max_length=2000)
     about: Optional[str] = Field(None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_update_salary(self) -> "CandidateProfileUpdateRequest":
+        if self.salary_currency is not None and self.salary_currency != "RUB":
+            raise ValueError("Валюта зарплаты должна быть строго RUB (ERR_INVALID_CURRENCY)")
+        if self.salary_min is not None and self.salary_min <= 0:
+            raise ValueError("salary_min должен быть строго больше нуля (ERR_SALARY_MIN_NOT_POSITIVE)")
+        if self.salary_min is not None and self.salary_max is not None:
+            if self.salary_max < self.salary_min:
+                raise ValueError("salary_max не может быть меньше salary_min (ERR_SALARY_MAX_LT_MIN)")
+            ratio = self.salary_max / self.salary_min
+            if ratio > 3.5:
+                raise ValueError(f"Разброс зарплатной вилки {ratio:.2f} превышает 3.5 (ERR_SUSPICIOUS_SALARY_SPREAD)")
+        return self
 
 
 class CandidateCategoryStatusResponse(BaseSchema):

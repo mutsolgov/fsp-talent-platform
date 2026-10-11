@@ -37,5 +37,15 @@ class Settings(BaseSettings):
     # 152-ФЗ Policy version
     POLICY_VERSION: str = "v1.0-2026"
 
+    # Demo & Jury bypass configuration
+    DEMO_BYPASS_ENABLED: bool = os.getenv("DEMO_BYPASS_ENABLED", "True").lower() in ("true", "1", "yes")
+    COOLDOWN_DAYS: int = int(os.getenv("COOLDOWN_DAYS", "30"))
+
+    # Keycloak 26 OIDC Configuration
+    KEYCLOAK_INTERNAL_URL: str = os.getenv("KEYCLOAK_INTERNAL_URL", "http://keycloak:8080/auth")
+    KEYCLOAK_EXTERNAL_URL: str = os.getenv("KEYCLOAK_EXTERNAL_URL", "/auth")
+    KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "fsp-realm")
+    KEYCLOAK_CLIENT_ID: str = os.getenv("KEYCLOAK_CLIENT_ID", "fsp-frontend")
+
 
 settings = Settings()

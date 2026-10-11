@@ -2,11 +2,12 @@ import React from 'react';
 import { VacancySummary } from '../../types';
 import { RubCurrencySymbol } from '../atoms/RubCurrencySymbol';
 import { Badge } from '../atoms/Badge';
-import { Building, ShieldCheck, ArrowRight } from '../icons';
+import { Building, ShieldCheck, ArrowRight, CheckCircle } from '../icons';
 
 export interface VacancyCardProps {
   vacancy: VacancySummary;
   onApplyClick?: () => void;
+  isApplied?: boolean;
   isPublic?: boolean;
   className?: string;
 }
@@ -14,6 +15,7 @@ export interface VacancyCardProps {
 export const VacancyCard: React.FC<VacancyCardProps> = ({
   vacancy,
   onApplyClick,
+  isApplied = false,
   isPublic = false,
   className = '',
 }) => {
@@ -41,9 +43,17 @@ export const VacancyCard: React.FC<VacancyCardProps> = ({
             </div>
           </div>
 
-          <Badge variant="fsp" size="sm">
-            {vacancy.grade.toUpperCase()}
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            {isApplied && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#00F5D4] bg-[#00F5D4]/10 px-2.5 py-1 rounded-full border border-[#00F5D4]/40">
+                <CheckCircle size={12} />
+                <span>Отклик отправлен</span>
+              </span>
+            )}
+            <Badge variant="fsp" size="sm">
+              {vacancy.grade.toUpperCase()}
+            </Badge>
+          </div>
         </div>
 
         {/* Salary range in RUB */}
@@ -72,7 +82,12 @@ export const VacancyCard: React.FC<VacancyCardProps> = ({
       <div className="flex items-center justify-between border-t border-[#2D2E37] pt-3 text-xs font-mono">
         <span className="text-[#9B9C9E]">{vacancy.location || 'Москва • Удаленно'}</span>
 
-        {onApplyClick && (
+        {isApplied ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#00F5D4]/10 border border-[#00F5D4]/30 text-[#00F5D4] text-xs font-mono font-medium">
+            <CheckCircle size={14} />
+            <span>Отклик отправлен</span>
+          </span>
+        ) : onApplyClick ? (
           <button
             type="button"
             onClick={onApplyClick}
@@ -81,7 +96,7 @@ export const VacancyCard: React.FC<VacancyCardProps> = ({
             <span>Откликнуться</span>
             <ArrowRight size={14} />
           </button>
-        )}
+        ) : null}
       </div>
     </article>
   );

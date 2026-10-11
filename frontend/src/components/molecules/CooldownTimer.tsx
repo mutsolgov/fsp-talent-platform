@@ -74,9 +74,17 @@ export const CooldownTimer: React.FC<CooldownTimerProps> = ({
 
   if (!timeLeft && !isCooldownBypassActive) {
     return (
-      <div className={`inline-flex items-center gap-2 text-xs font-mono text-[#00F5D4] ${className}`}>
-        <span className="w-2 h-2 rounded-full bg-[#00F5D4]" />
-        Кулдаун не активен — повторное тестирование доступно
+      <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs font-mono text-[#00F5D4] ${className}`}>
+        <div className="inline-flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#00F5D4]" />
+          <span>Кулдаун не активен — повторное тестирование доступно</span>
+        </div>
+        <a
+          href="/candidate/assessment"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] bg-[#00F5D4]/10 hover:bg-[#00F5D4]/20 border border-[#00F5D4]/40 text-[#00F5D4] text-xs font-semibold transition-colors shrink-0"
+        >
+          <span>Пройти калибровку</span>
+        </a>
       </div>
     );
   }
@@ -92,7 +100,7 @@ export const CooldownTimer: React.FC<CooldownTimerProps> = ({
           <Clock size={18} className="text-[#FBBF24] shrink-0" />
           <div className="flex flex-col">
             <span className="text-xs font-mono font-medium text-[#FBBF24]">
-              Кулдаун 90 дней активен
+              Кулдаун 30 дней активен
             </span>
             {timeLeft && (
               <span className="text-sm font-mono font-bold text-white tracking-wider">
@@ -109,7 +117,7 @@ export const CooldownTimer: React.FC<CooldownTimerProps> = ({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#402FFF] hover:bg-[#3525E0] text-white text-xs font-mono font-semibold transition-all cursor-pointer shadow-[0_0_12px_rgba(64,47,255,0.4)] disabled:opacity-50"
         >
           <Zap size={14} className="text-[#00F5D4]" />
-          {isBypassing ? 'Сброс...' : '⚡ Сбросить кулдаун 90 дней (Демо)'}
+          {isBypassing ? 'Сброс...' : '⚡ Сбросить кулдаун 30 дней (Демо)'}
         </button>
       </div>
       {bypassError && (

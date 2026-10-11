@@ -11,6 +11,7 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Union
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -19,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.applications import router as applications_router
 from app.api.v1.assessment import router as assessment_router
 from app.api.v1.ats_integration import router as ats_integration_router
@@ -35,7 +37,16 @@ from app.api.v1.resume_pdf import router as resume_pdf_router
 from app.api.v1.vacancies import router as vacancies_router
 from app.api.v1.validation_benchmark import router as validation_benchmark_router
 from app.core.config import settings
+from app.database import ensure_keycloak_schema
 from app.schemas.base import ErrorDetail, ErrorResponse
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan context manager for application startup and shutdown."""
+    await ensure_keycloak_schema()
+    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -44,6 +55,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 # CORS Middleware
@@ -116,6 +128,7 @@ app.include_router(applications_router, prefix=settings.API_V1_STR)
 app.include_router(ats_integration_router, prefix=settings.API_V1_STR)
 app.include_router(validation_benchmark_router, prefix=settings.API_V1_STR)
 app.include_router(demo_router, prefix=settings.API_V1_STR)
+app.include_router(admin_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/api/health", tags=["system"], summary="Проверка работоспособности сервиса")

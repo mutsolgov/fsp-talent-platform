@@ -15,13 +15,26 @@ export const OidcCallbackPage: React.FC = () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        const storedState = sessionStorage.getItem('fsp_oidc_state');
+
+        if (storedState && state && state !== storedState) {
+          sessionStorage.removeItem('fsp_oidc_state');
+          sessionStorage.removeItem('fsp_pkce_verifier');
+          setStatus('error');
+          setMessage('Ошибка безопасности: несовпадение CSRF-параметра state при авторизации через Keycloak');
+          return;
+        }
+        sessionStorage.removeItem('fsp_oidc_state');
+
         if (!code) {
           setStatus('error');
           setMessage('Код авторизации не получен от провайдера Keycloak ФСП ID (параметр code отсутствует)');
           return;
         }
         const redirectUri = window.location.origin + window.location.pathname;
-        const codeVerifier = 'fsp_pkce_verifier_long_enough_random_128';
+        const storedVerifier = sessionStorage.getItem('fsp_pkce_verifier');
+        const codeVerifier = storedVerifier || 'fsp_pkce_verifier_long_enough_random_128';
 
         // Exchange OIDC code via API client
         const data = await api.post<any>('/fsp-integration/connect', {
@@ -30,15 +43,27 @@ export const OidcCallbackPage: React.FC = () => {
           code_verifier: codeVerifier,
         });
 
+        // Clean up verifier
+        sessionStorage.removeItem('fsp_pkce_verifier');
+
+        const userRole = data.role || 'candidate';
         if (data.access_token) {
-          setAuthSession(data.access_token, data.refresh_token || '', data.role || 'candidate', data.user_id || 1, data.email || 'athlete@fsp-russia.ru');
+          setAuthSession(data.access_token, data.refresh_token || '', userRole, data.user_id || 1, data.email || 'athlete@fsp-russia.ru');
         }
         setStatus('success');
-        setMessage(`ФСП ID ${data.fsp_id || ''} успешно верифицирован! Перенаправление в профиль...`);
+        setMessage(`Авторизация успешна (Роль: ${userRole})! Перенаправление...`);
+        const targetUrl =
+          userRole === 'employer'
+            ? '/employer/candidate-bank'
+            : userRole === 'admin'
+            ? '/admin/audit-logs'
+            : '/candidate/profile';
         setTimeout(() => {
-          window.location.href = '/candidate/profile';
+          window.location.href = targetUrl;
         }, 1200);
       } catch (err: any) {
+        sessionStorage.removeItem('fsp_oidc_state');
+        sessionStorage.removeItem('fsp_pkce_verifier');
         setStatus('error');
         setMessage(err?.message || 'Ошибка верификации через Keycloak ФСП ID');
       }

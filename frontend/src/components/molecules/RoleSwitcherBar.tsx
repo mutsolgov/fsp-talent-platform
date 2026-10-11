@@ -36,6 +36,13 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
   isFloating = false,
   className = '',
 }) => {
+  // In production mode, hide floating demo bar unless explicitly enabled via VITE_ENABLE_DEMO_BAR
+  const isDemoBarEnabled = Boolean(import.meta.env?.VITE_ENABLE_DEMO_BAR === 'true');
+
+  if (!isDemoBarEnabled) {
+    return null;
+  }
+
   const { role: storeRole, setAuthSession } = useAuthStore();
   const { activePersona, switchPersona } = useJuryDemoStore();
   const [loadingPersona, setLoadingPersona] = useState<string | null>(null);
@@ -110,9 +117,6 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
         isFloating ? 'fixed bottom-4 left-1/2 -translate-x-1/2 z-50' : ''
       } ${className}`}
     >
-      <span className="text-[11px] font-mono text-[#9B9C9E] px-2 hidden md:inline">
-        Демо Жюри:
-      </span>
 
       {personas.map((p) => {
         const isSelected = activePersona === p.id || (active === p.role && !propRole);

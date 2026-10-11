@@ -85,3 +85,110 @@ def test_taxonomy_350_plus_completeness():
     assert "devops" in TAXONOMY_350_PLUS
     assert "qa" in TAXONOMY_350_PLUS
     assert "infosec" in TAXONOMY_350_PLUS
+
+
+def test_city_extraction_known_and_none():
+    """Проверка определения городов РФ и возврат None при отсутствии (устранение хардкода Москвы)."""
+    assert ResumeParser.extract_city("Проживание: г. Санкт-Петербург, готов к релокации") == "Санкт-Петербург"
+    assert ResumeParser.extract_city("Локация: Казань") == "Казань"
+    assert ResumeParser.extract_city("Живу в Екатеринбурге, удаленка") == "Екатеринбург"
+    assert ResumeParser.extract_city("Иванов Иван, Python разработчик, удаленная работа") is None
+
+
+def test_salary_expectations_parsing():
+    """Проверка парсинга зарплатной вилки и соблюдения инварианта max/min <= 3.5."""
+    min_val, max_val = ResumeParser.parse_salary_expectations("Ожидания по ЗП: от 180 000 до 250 000 руб")
+    assert min_val == 180000
+    assert max_val == 250000
+    assert max_val / min_val <= 3.5
+
+    min_val2, max_val2 = ResumeParser.parse_salary_expectations("Желаемый доход: 200 000 ₽")
+    assert min_val2 is not None and max_val2 is not None
+    assert min_val2 <= 200000 <= max_val2
+    assert max_val2 / min_val2 <= 3.5
+
+    min_val3, max_val3 = ResumeParser.parse_salary_expectations("Зарплата: 250 тыс руб")
+    assert min_val3 is not None and max_val3 is not None
+    assert max_val3 / min_val3 <= 3.5
+
+    # Если зарплата не указана
+    no_min, no_max = ResumeParser.parse_salary_expectations("Условия: удаленная работа, гибкий график")
+    assert no_min is None
+    assert no_max is None
+
+
+def test_specialization_detection():
+    """Проверка автоопределения канонической специализации из 6 категорий."""
+    fe_skills = ["react", "typescript", "tailwind", "next.js"]
+    assert ResumeParser.detect_specialization(fe_skills, "Frontend Developer, React, Redux") == "frontend"
+
+    ml_skills = ["pytorch", "pandas", "numpy", "transformers"]
+    assert ResumeParser.detect_specialization(ml_skills, "ML Engineer, Data Science, LLM") == "ml_data"
+
+    devops_skills = ["kubernetes", "docker", "terraform", "ansible"]
+    assert ResumeParser.detect_specialization(devops_skills, "DevOps Engineer, SRE, CI/CD") == "devops"
+
+    qa_skills = ["playwright", "pytest", "selenium", "allure"]
+    assert ResumeParser.detect_specialization(qa_skills, "QA Automation Engineer") == "qa"
+
+    sec_skills = ["burp suite", "owasp", "metasploit", "wireshark"]
+    assert ResumeParser.detect_specialization(sec_skills, "Application Security Specialist") == "infosec"
+
+
+def test_grade_detection_by_experience_and_marker():
+    """Проверка автоопределения грейда по шкале стажа (<18, 18-48, 48-84, >=84 мес) и маркерам."""
+    assert ResumeParser.detect_grade(12, "Разработчик") == "junior"
+    assert ResumeParser.detect_grade(36, "Разработчик") == "middle"
+    assert ResumeParser.detect_grade(60, "Разработчик") == "senior"
+    assert ResumeParser.detect_grade(96, "Разработчик") == "lead"
+
+    # Явные маркеры имеют приоритет
+    assert ResumeParser.detect_grade(12, "Senior Python Developer") == "senior"
+    assert ResumeParser.detect_grade(70, "Junior QA Engineer") == "junior"
+    assert ResumeParser.detect_grade(24, "Team Lead Backend") == "lead"
+
+
+def test_parser_none_and_empty_edge_cases():
+    """Проверка устойчивости всех методов парсера к аргументам None и пустым строкам."""
+    assert ResumeParser.extract_city(None) is None
+    assert ResumeParser.extract_city("") is None
+    assert ResumeParser.parse_salary_expectations(None) == (None, None)
+    assert ResumeParser.parse_salary_expectations("") == (None, None)
+    assert ResumeParser.detect_specialization(None, None) == "backend"
+    assert ResumeParser.detect_specialization([], "") == "backend"
+    assert ResumeParser.detect_grade(None, None) == "junior"
+    assert ResumeParser.detect_grade(0, "") == "junior"
+    assert ResumeParser.extract_contacts(None) == {
+        "email": None, "phone": None, "telegram": None, "github_url": None
+    }
+    assert ResumeParser.match_skills(None) == []
+    assert ResumeParser.parse_experience_and_education(None) == ([], [], 0)
+
+
+def test_salary_expectations_advanced_formats():
+    """Проверка продвинутых паттернов зарплатной вилки (k, тыс, от-до)."""
+    # 150 - 200 тыс руб
+    s_min, s_max = ResumeParser.parse_salary_expectations("Зарплата: 150 - 200 тыс руб")
+    assert s_min == 150000 and s_max == 200000
+    assert s_max / s_min <= 3.5
+
+    # 150-200k
+    s_min2, s_max2 = ResumeParser.parse_salary_expectations("150-200k")
+    assert s_min2 == 150000 and s_max2 == 200000
+
+    # 150к - 200к
+    s_min3, s_max3 = ResumeParser.parse_salary_expectations("150к - 200к")
+    assert s_min3 == 150000 and s_max3 == 200000
+
+    # от 150 000 руб
+    s_min4, s_max4 = ResumeParser.parse_salary_expectations("от 150 000 руб")
+    assert s_min4 == 150000 and s_max4 == 200000
+
+
+def test_contacts_email_clean_punctuation():
+    """Проверка очистки email от замыкающей пунктуации предложения."""
+    text = "Свяжитесь со мной по почте ivan.dev@corp.ru. Жду ответа!"
+    contacts = ResumeParser.extract_contacts(text)
+    assert contacts["email"] == "ivan.dev@corp.ru"
+
+

@@ -125,19 +125,13 @@ export const CandidateVacanciesPage: React.FC = () => {
             ) : (
               <div className="flex flex-col gap-4">
                 {vacancies.map((vacancy) => (
-                  <div key={vacancy.id} className="relative">
-                    <VacancyCard
-                      vacancy={vacancy}
-                      onApplyClick={() => handleApply(vacancy.id)}
-                      isPublic={false}
-                    />
-                    {appliedIds.includes(vacancy.id) && (
-                      <div className="absolute top-4 right-4 bg-[#00F5D4]/10 border border-[#00F5D4]/40 text-[#00F5D4] text-[11px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                        <CheckCircle size={12} />
-                        <span>Отклик отправлен</span>
-                      </div>
-                    )}
-                  </div>
+                  <VacancyCard
+                    key={vacancy.id}
+                    vacancy={vacancy}
+                    isApplied={appliedIds.includes(vacancy.id)}
+                    onApplyClick={() => handleApply(vacancy.id)}
+                    isPublic={false}
+                  />
                 ))}
               </div>
             )}

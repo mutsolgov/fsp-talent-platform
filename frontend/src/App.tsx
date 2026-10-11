@@ -132,7 +132,7 @@ export const routes: RouteDefinition[] = [
     {
       id: 'R10',
       path: '/candidate/assessment/:sessionId',
-      pattern: /^\/candidate\/assessment\/\d+$/,
+      pattern: /^\/candidate\/assessment(?:\/\d+)?$/,
       allowedRoles: ['candidate', 'admin'],
       component: AssessmentSessionPage,
     },

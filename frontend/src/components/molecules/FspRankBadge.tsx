@@ -14,6 +14,18 @@ export const FspRankBadge: React.FC<FspRankBadgeProps> = ({
   contestCount,
   className = '',
 }) => {
+  if (rank === 'Без разряда') {
+    return (
+      <div
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#1E293B] border border-[#64748B] text-[#94A3B8] text-xs font-mono select-none ${className}`}
+        title="Без спортивного разряда ФСП"
+      >
+        <Medal size={14} className="text-[#64748B]" />
+        <span className="font-bold">Без разряда</span>
+      </div>
+    );
+  }
+
   if (!isFspVerified || !rank) {
     // Non-FSP: "Общий трек: Верифицированный IT-Талант" (Zero-Stigma Parity)
     return (

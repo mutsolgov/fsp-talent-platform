@@ -202,11 +202,38 @@ def generate_fsp_profile_pdf(
     story.append(Spacer(1, 10))
 
     # 3. Verified Category & KITE IRT Score
-    spec = str(candidate_data.get("specialization", "Backend")).capitalize()
-    grade = str(candidate_data.get("grade", "Middle")).capitalize()
-    score = candidate_data.get("test_score", candidate_data.get("theta", 85.0))
+    raw_spec = candidate_data.get("specialization")
+    raw_grade = candidate_data.get("grade")
+
+    invalid_specs = ("none", "не выбрана", "не определена", "не выбрано", "")
+    invalid_grades = ("none", "не определен", "не определено", "ожидает тестирования", "")
+
+    spec_valid = bool(raw_spec and str(raw_spec).strip().lower() not in invalid_specs)
+    grade_valid = bool(raw_grade and str(raw_grade).strip().lower() not in invalid_grades)
+
+    if spec_valid and grade_valid:
+        spec_text = str(raw_spec).capitalize()
+        grade_text = str(raw_grade).capitalize()
+        qual_text = f"Квалификация: <b>{spec_text} · {grade_text}</b>"
+    else:
+        qual_text = "Квалификация: <b>Ожидает верификации</b>"
+
+    raw_score = candidate_data.get("test_score")
+    if raw_score is None:
+        raw_score = candidate_data.get("theta")
+
+    try:
+        score_val = float(raw_score) if raw_score is not None else 0.0
+    except (ValueError, TypeError):
+        score_val = 0.0
+
+    if score_val > 0.0:
+        score_text = f"Балл адаптивного тестирования KITE IRT: <b>{score_val:.1f} / 100</b>"
+    else:
+        score_text = "Балл адаптивного тестирования KITE IRT: <b>Тестирование не пройдено</b>"
+
     story.append(Paragraph("ПОДТВЕРЖДЕННАЯ КАТЕГОРИЯ", h2_style))
-    cat_text = f"Квалификация: <b>{spec} · {grade}</b><br/>Балл адаптивного тестирования KITE IRT: <b>{score:.1f} / 100</b>"
+    cat_text = f"{qual_text}<br/>{score_text}"
     story.append(Paragraph(cat_text, body_style))
 
     story.append(Spacer(1, 10))
@@ -217,7 +244,8 @@ def generate_fsp_profile_pdf(
     if fsp_id:
         fsp_verified = candidate_data.get("fsp_verified", True)
         badge = "Верифицирован в реестре ФСП" if fsp_verified else "В процессе верификации"
-        rank = candidate_data.get("sport_rank", "1-й спортивный разряд")
+        raw_rank = candidate_data.get("sport_rank")
+        rank = str(raw_rank) if raw_rank and str(raw_rank).strip().lower() not in ("none", "") else "Без спортивного разряда"
         fsp_text = (
             f"Статус: <b>{badge}</b> (ФСП ID: {fsp_id})<br/>"
             f"Спортивный разряд: <b>{rank}</b>"
@@ -248,17 +276,37 @@ def generate_fsp_profile_pdf(
     # 5. Technology Stack
     story.append(Paragraph("ПОДТВЕРЖДЕННЫЙ ТЕХНОЛОГИЧЕСКИЙ СТЕК", h2_style))
     skills = candidate_data.get("skills", [])
-    skills_str = ", ".join(skills) if skills else "Python, FastAPI, PostgreSQL, Docker, Redis"
-    story.append(Paragraph(f"Технологии: {skills_str}", body_style))
+    if skills:
+        skills_str = ", ".join(skills)
+        story.append(Paragraph(f"Технологии: {skills_str}", body_style))
+    else:
+        story.append(
+            Paragraph(
+                "Навыки не подтверждены. Требуется прохождение онбординга и тестирования KITE.",
+                body_style,
+            )
+        )
 
     # 6. Conditions & Preferences
     story.append(Spacer(1, 10))
     story.append(Paragraph("УСЛОВИЯ И ПРЕДПОЧТЕНИЯ", h2_style))
-    city = candidate_data.get("city", "Москва")
-    fmt = candidate_data.get("work_format", "remote")
+    raw_city = candidate_data.get("city")
+    city_str = str(raw_city) if raw_city and str(raw_city).strip().lower() not in ("none", "") else "Не указан"
+
+    raw_fmt = candidate_data.get("work_format")
+    fmt_str = str(raw_fmt) if raw_fmt and str(raw_fmt).strip().lower() not in ("none", "") else "Не указан"
+
     exp_sal = candidate_data.get("expected_salary")
-    sal_str = f"{exp_sal:,} ₽".replace(",", " ") if exp_sal else "Не указаны (по договоренности)"
-    cond_text = f"Город: <b>{city}</b> | Формат работы: <b>{fmt}</b> | Ожидаемая ЗП: <b>{sal_str}</b>"
+    if exp_sal is not None:
+        try:
+            sal_num = int(exp_sal)
+            sal_str = f"{sal_num:,} ₽".replace(",", " ")
+        except (ValueError, TypeError):
+            sal_str = str(exp_sal)
+    else:
+        sal_str = "Не указана (по договоренности)"
+
+    cond_text = f"Город: <b>{city_str}</b> | Формат работы: <b>{fmt_str}</b> | Ожидаемая ЗП: <b>{sal_str}</b>"
     story.append(Paragraph(cond_text, body_style))
 
     # Watermark callback for Mode A

@@ -1,5 +1,6 @@
-import React from 'react';
-import { Download, FileText } from '../icons';
+import React, { useState } from 'react';
+import { Download, FileText, RefreshCw, AlertCircle } from '../icons';
+import { api } from '../../api/client';
 
 export interface PdfPreviewThumbnailProps {
   candidateId: number;
@@ -12,7 +13,26 @@ export const PdfPreviewThumbnail: React.FC<PdfPreviewThumbnailProps> = ({
   mode = 'auto',
   className = '',
 }) => {
-  const downloadUrl = `/api/v1/resume-pdf/export-fsp/${candidateId}?mode=${mode}`;
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    setError(null);
+    try {
+      await api.downloadBlob(
+        `/resume-pdf/export-fsp/${candidateId}?mode=${mode}`,
+        `fsp_profile_${candidateId}.pdf`
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не удалось скачать PDF-профиль';
+      setError(message);
+      setTimeout(() => setError(null), 4000);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div
@@ -38,16 +58,39 @@ export const PdfPreviewThumbnail: React.FC<PdfPreviewThumbnailProps> = ({
         </span>
       </div>
 
-      <a
-        href={downloadUrl}
-        target="_blank"
-        rel="noreferrer"
+      {error && (
+        <div
+          role="alert"
+          className="w-full p-2 bg-red-500/10 border border-red-500/40 text-red-400 rounded-[6px] text-[10px] font-mono flex items-center gap-1.5"
+        >
+          <AlertCircle size={12} className="shrink-0" />
+          <span className="truncate">{error}</span>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={isDownloading}
         aria-label="Скачать PDF ФСП"
-        className="w-full py-1.5 px-3 rounded-[6px] bg-[#402FFF] hover:bg-[#3525E0] text-white text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-colors"
+        className={`w-full py-1.5 px-3 rounded-[6px] text-white text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+          isDownloading
+            ? 'bg-[#402FFF]/60 cursor-not-allowed'
+            : 'bg-[#402FFF] hover:bg-[#3525E0]'
+        }`}
       >
-        <Download size={14} />
-        Скачать PDF
-      </a>
+        {isDownloading ? (
+          <>
+            <RefreshCw size={14} className="animate-spin text-white" />
+            <span>Генерация...</span>
+          </>
+        ) : (
+          <>
+            <Download size={14} />
+            <span>Скачать PDF</span>
+          </>
+        )}
+      </button>
     </div>
   );
 };

@@ -599,7 +599,7 @@ def rank_candidates(need: Dict[str, Any], candidates: List[Dict[str, Any]]) -> L
 
             has_fsp = cand.get("fsp_id") is not None
             if has_fsp:
-                w_test, w_stack, w_fsp, w_freshness = 0.35, 0.25, 0.25, 0.15
+                w_test, w_stack, w_fsp, w_freshness = 0.40, 0.25, 0.20, 0.15
             else:
                 # Dynamic weight reallocation: zero penalty, equal mathematical opportunity
                 w_test, w_stack, w_fsp, w_freshness = 0.52, 0.30, 0.00, 0.18

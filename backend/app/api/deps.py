@@ -4,7 +4,7 @@ Defined in docs/04_OPENAPI_CONTRACTS_AND_SECURITY.md.
 """
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,8 +31,8 @@ async def get_or_create_candidate_profile(
             user_id=user_id,
             first_name="Соискатель",
             last_name="ФСП",
-            city="Москва",
-            work_format="remote",
+            city=None,
+            work_format=None,
             freshness_score=50.0,
             is_published=True,
         )
@@ -71,9 +71,35 @@ async def get_current_employer(
     return profile
 
 
+async def get_current_user_optional(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    Optionally extracts current user from Authorization header.
+    Returns None without throwing HTTP 401 if header is absent or invalid.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1]
+    try:
+        from app.core.security import decode_access_token
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        res = await db.execute(select(User).where(User.id == int(user_id)))
+        return res.scalar_one_or_none()
+    except Exception:
+        return None
+
+
 __all__ = [
     "get_current_employer",
     "get_current_user",
+    "get_current_user_optional",
     "get_db",
     "get_or_create_candidate_profile",
 ]
+

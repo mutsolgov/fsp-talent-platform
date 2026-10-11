@@ -4,13 +4,14 @@ import { CandidateCardUnmasked } from '../components/organisms/CandidateCardUnma
 import { Badge } from '../components/atoms/Badge';
 import { Button } from '../components/atoms/Button';
 import { CandidateFullProfileResponse } from '../types';
-import { Users, Mail, CheckCircle, Download, FileText } from '../components/icons';
+import { Users, Mail, CheckCircle, Download, FileText, AlertCircle } from '../components/icons';
 import { api } from '../api/client';
 
 export const EmployerApplicationsPage: React.FC = () => {
   const [applications, setApplications] = useState<CandidateFullProfileResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -94,6 +95,13 @@ export const EmployerApplicationsPage: React.FC = () => {
           </div>
         )}
 
+        {downloadError && (
+          <div role="alert" className="p-3 bg-red-500/10 border border-red-500/40 text-red-400 rounded-[8px] text-xs font-mono flex items-center gap-2">
+            <AlertCircle size={16} />
+            <span>{downloadError}</span>
+          </div>
+        )}
+
         {applications.length === 0 ? (
           <div className="p-12 text-center bg-[#202129] rounded-[16px] border border-[#2D2E37] text-xs font-mono text-[#9B9C9E]">
             {isLoading ? 'Загрузка откликов...' : 'Пока нет полученных откликов на ваши вакансии.'}
@@ -104,7 +112,21 @@ export const EmployerApplicationsPage: React.FC = () => {
               <CandidateCardUnmasked
                 key={cand.id}
                 candidate={cand}
-                onPdfDownload={() => window.open('/api/v1/resume-pdf/' + cand.id + '/full', '_blank')}
+                onPdfDownload={async () => {
+                  setDownloadError(null);
+                  try {
+                    await api.downloadBlob(
+                      `/resume-pdf/${cand.id}/full`,
+                      `fsp_candidate_${cand.id}_full.pdf`
+                    );
+                    setExportNotice(`PDF соискателя #${cand.id} успешно скачан`);
+                    setTimeout(() => setExportNotice(null), 4000);
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : 'Ошибка при выгрузке PDF';
+                    setDownloadError(`Не удалось скачать PDF: ${msg}`);
+                    setTimeout(() => setDownloadError(null), 5000);
+                  }
+                }}
               />
             ))}
           </div>

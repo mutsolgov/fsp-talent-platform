@@ -99,6 +99,98 @@ RE_GITHUB = re.compile(
     r"(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9_-]{1,39})", re.IGNORECASE
 )
 
+# Список городов РФ с нормализацией падежей и альтернативных наименований
+RUSSIAN_CITIES: List[Tuple[str, str]] = [
+    ("Москва", r"\b(?:москв[аеыу]|moscow)\b"),
+    ("Санкт-Петербург", r"\b(?:санкт-петербург[ае]?|петербург[ае]?|спб|питер[е]?|saint[- ]petersburg)\b"),
+    ("Новосибирск", r"\b(?:новосибирск[ае]?|novosibirsk)\b"),
+    ("Екатеринбург", r"\b(?:екатеринбург[ае]?|екб|yekaterinburg|ekaterinburg)\b"),
+    ("Казань", r"\b(?:казан[ьиея]?|kazan)\b"),
+    ("Нижний Новгород", r"\b(?:нижн(?:ий|его|ем|ему)\s+новгород[ае]?|nizhny\s+novgorod)\b"),
+    ("Челябинск", r"\b(?:челябинск[ае]?|chelyabinsk)\b"),
+    ("Самара", r"\b(?:самар[аеыу]|samara)\b"),
+    ("Ростов-на-Дону", r"\b(?:ростов-на-дону|ростов[еа]?|rostov)\b"),
+    ("Уфа", r"\b(?:уф[аеыу]|ufa)\b"),
+    ("Красноярск", r"\b(?:красноярск[ае]?|krasnoyarsk)\b"),
+    ("Пермь", r"\b(?:перм[ьиея]?|perm)\b"),
+    ("Воронеж", r"\b(?:воронеж[ае]?|voronezh)\b"),
+    ("Волгоград", r"\b(?:волгоград[ае]?|volgograd)\b"),
+    ("Краснодар", r"\b(?:краснодар[ае]?|krasnodar)\b"),
+    ("Саратов", r"\b(?:саратов[ае]?|saratov)\b"),
+    ("Тюмень", r"\b(?:тюмен[ьиея]?|tyumen)\b"),
+    ("Тольятти", r"\b(?:тольятти|tolyatti)\b"),
+    ("Ижевск", r"\b(?:ижевск[ае]?|izhevsk)\b"),
+    ("Барнаул", r"\b(?:барнаул[ае]?|barnaul)\b"),
+    ("Ульяновск", r"\b(?:ульяновск[ае]?|ulyanovsk)\b"),
+    ("Иркутск", r"\b(?:иркутск[ае]?|irkutsk)\b"),
+    ("Владивосток", r"\b(?:владивосток[ае]?|vladivostok)\b"),
+    ("Ярославль", r"\b(?:ярославл[ьея]|yaroslavl)\b"),
+    ("Севастополь", r"\b(?:севастопол[ьея]|sevastopol)\b"),
+    ("Томск", r"\b(?:томск[ае]?|tomsk)\b"),
+    ("Оренбург", r"\b(?:оренбург[ае]?|orenburg)\b"),
+    ("Кемерово", r"\b(?:кемеров[оеа]|kemerovo)\b"),
+    ("Новокузнецк", r"\b(?:новокузнецк[ае]?|novokuznetsk)\b"),
+    ("Рязань", r"\b(?:рязан[ьиея]?|ryazan)\b"),
+    ("Астрахань", r"\b(?:астрахан[ьиея]?|astrakhan)\b"),
+    ("Набережные Челны", r"\b(?:набережные\s+челны|naberezhnye\s+chelny)\b"),
+    ("Пенза", r"\b(?:пенз[аеыу]|penza)\b"),
+    ("Липецк", r"\b(?:липецк[ае]?|lipetsk)\b"),
+    ("Тула", r"\b(?:тул[аеыу]|tula)\b"),
+    ("Киров", r"\b(?:киров[ае]?|kirov)\b"),
+    ("Чебоксары", r"\b(?:чебоксар[ыае]|cheboksary)\b"),
+    ("Калининград", r"\b(?:калининград[ае]?|kaliningrad)\b"),
+    ("Брянск", r"\b(?:брянск[ае]?|bryansk)\b"),
+    ("Курск", r"\b(?:курск[ае]?|kursk)\b"),
+    ("Иваново", r"\b(?:иванов[оеа]|ivanovo)\b"),
+    ("Магнитогорск", r"\b(?:магнитогорск[ае]?|magnitogorsk)\b"),
+    ("Тверь", r"\b(?:твер[ьиея]?|tver)\b"),
+    ("Сочи", r"\b(?:сочи|sochi)\b"),
+    ("Сургут", r"\b(?:сургут[ае]?|surgut)\b"),
+    ("Норильск", r"\b(?:норильск[ае]?|norilsk)\b"),
+    ("Магадан", r"\b(?:магадан[ае]?|magadan)\b"),
+    ("Якутск", r"\b(?:якутск[ае]?|yakutsk)\b"),
+    ("Хабаровск", r"\b(?:хабаровск[ае]?|khabarovsk)\b"),
+    ("Владикавказ", r"\b(?:владикавказ[ае]?|vladikavkaz)\b"),
+    ("Грозный", r"\b(?:грозн(?:ый|ом|ого|ому)|grozny)\b"),
+    ("Южно-Сахалинск", r"\b(?:южно-сахалинск[ае]?|yuzhno-sakhalinsk)\b"),
+    ("Петропавловск-Камчатский", r"\b(?:петропавловск-камчатск(?:ий|ом|ого)|petropavlovsk)\b"),
+    ("Архангельск", r"\b(?:архангельск[ае]?|arkhangelsk)\b"),
+    ("Мурманск", r"\b(?:мурманск[ае]?|murmansk)\b"),
+    ("Чита", r"\b(?:чит[аеыу]|chita)\b"),
+    ("Вологда", r"\b(?:вологд[аеыу]|vologda)\b"),
+    ("Смоленск", r"\b(?:смоленск[ае]?|smolensk)\b"),
+    ("Саранск", r"\b(?:саранск[ае]?|saransk)\b"),
+    ("Тамбов", r"\b(?:тамбов[ае]?|tambov)\b"),
+    ("Кострома", r"\b(?:костром[аеыу]|kostroma)\b"),
+    ("Псков", r"\b(?:псков[ае]?|pskov)\b"),
+    ("Таганрог", r"\b(?:таганрог[ае]?|taganrog)\b"),
+    ("Нальчик", r"\b(?:нальчик[ае]?|nalchik)\b"),
+    ("Сыктывкар", r"\b(?:сыктывкар[ае]?|syktyvkar)\b"),
+    ("Йошкар-Ола", r"\b(?:йошкар-ол[аеыу]|yoshkar-ola)\b"),
+    ("Курган", r"\b(?:курган[ае]?|kurgan)\b"),
+    ("Комсомольск-на-Амуре", r"\b(?:комсомольск-на-амуре|komsomolsk)\b"),
+    ("Благовещенск", r"\b(?:благовещенск[ае]?|blagoveshchensk)\b"),
+    ("Ханты-Мансийск", r"\b(?:ханты-мансийск[ае]?|khanty-mansiysk)\b"),
+    ("Анадырь", r"\b(?:анадыр[ьея]|anadyr)\b"),
+    ("Дербент", r"\b(?:дербент[ае]?|derbent)\b"),
+    ("Великий Новгород", r"\b(?:велик(?:ий|ого|ем)\s+новгород[ае]?|veliky\s+novgorod)\b"),
+    # Международные и зарубежные локации соискателей
+    ("Минск", r"\b(?:минск[ае]?|minsk)\b"),
+    ("Алматы", r"\b(?:алмат[ыае]|almaty)\b"),
+    ("Астана", r"\b(?:астан[аеыу]|astana|нур-султан[ае]?)\b"),
+    ("Ереван", r"\b(?:ереван[ае]?|yerevan)\b"),
+    ("Тбилиси", r"\b(?:тбилиси|tbilisi)\b"),
+    ("Ташкент", r"\b(?:ташкент[ае]?|tashkent)\b"),
+    ("Бишкек", r"\b(?:бишкек[ае]?|bishkek)\b"),
+    ("Баку", r"\b(?:баку|baku)\b"),
+    ("Белград", r"\b(?:белград[ае]?|belgrade)\b"),
+    ("Дубай", r"\b(?:дуба[йея]|dubai)\b"),
+    ("Лимассол", r"\b(?:лимассол[ае]?|limassol)\b"),
+    ("Стамбул", r"\b(?:стамбул[ае]?|istanbul)\b"),
+    ("Берлин", r"\b(?:берлин[ае]?|berlin)\b"),
+    ("Лондон", r"\b(?:лондон[ае]?|london)\b"),
+]
+
 
 class ResumeParser:
     """Парсер PDF-резюме со строгой валидацией magic bytes %PDF- и извлечением компетенций."""
@@ -189,10 +281,13 @@ class ResumeParser:
         return clean_stream
 
     @classmethod
-    def extract_contacts(cls, text: str) -> Dict[str, Optional[str]]:
+    def extract_contacts(cls, text: Optional[str]) -> Dict[str, Optional[str]]:
         """Извлекает телефон, email, telegram, github из текста."""
+        if not text or not isinstance(text, str):
+            return {"email": None, "phone": None, "telegram": None, "github_url": None}
+
         email_match = RE_EMAIL.search(text)
-        email = email_match.group(0).lower() if email_match else None
+        email = email_match.group(0).lower().rstrip(".,;:") if email_match else None
 
         phone_match = RE_PHONE.search(text)
         phone = phone_match.group(0) if phone_match else None
@@ -214,8 +309,11 @@ class ResumeParser:
         }
 
     @classmethod
-    def match_skills(cls, text: str) -> List[str]:
+    def match_skills(cls, text: Optional[str]) -> List[str]:
         """Сопоставляет текст резюме с канонической таксономией 350+ навыков."""
+        if not text or not isinstance(text, str):
+            return []
+
         text_lower = text.lower()
         matched: Set[str] = set()
 
@@ -231,9 +329,11 @@ class ResumeParser:
 
     @classmethod
     def parse_experience_and_education(
-        cls, text: str
+        cls, text: Optional[str]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int]:
         """Извлекает реальный опыт работы и образование по эвристикам из текста резюме."""
+        if not text or not isinstance(text, str):
+            return [], [], 0
         # Оценка суммарного стажа по годам / месяцам
         year_matches = re.findall(r"\b(20[0-2][0-9]|199[0-9])\b", text)
         total_months = 0
@@ -339,6 +439,212 @@ class ResumeParser:
         return experience, education, total_months
 
     @classmethod
+    def extract_city(cls, text: Optional[str]) -> Optional[str]:
+        """
+        Извлекает город соискателя из текста резюме.
+        Если город не указан или text пуст — возвращает None (устранение демо-хардкода Москвы).
+        """
+        if not text or not isinstance(text, str):
+            return None
+
+        # 1. Приоритетный поиск в блоке города / проживания
+        city_header = re.search(
+            r"(?i)(?:город|проживание|локация|место\s+жительства|г\.|city|location)[:\s]+([^\n,\.;]+)",
+            text,
+        )
+        if city_header:
+            header_chunk = city_header.group(1).strip()
+            for city_name, pat in RUSSIAN_CITIES:
+                if re.search(pat, header_chunk, re.IGNORECASE):
+                    return city_name
+
+        # 2. Поиск по всему тексту резюме
+        for city_name, pat in RUSSIAN_CITIES:
+            if re.search(pat, text, re.IGNORECASE):
+                return city_name
+
+        return None
+
+    @classmethod
+    def parse_salary_expectations(cls, text: Optional[str]) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Извлекает зарплатные ожидания (вилку min/max в RUB) из текста резюме.
+        Соблюдает строгий финансовый инвариант платформы: salary_min > 0, max >= min, max / min <= 3.5.
+        Поддерживает форматы «350k», «от 150 до 300 тыс. руб.», «180 - 250 тыс», «280 000 ₽».
+        """
+        if not text or not isinstance(text, str):
+            return None, None
+        def _parse_val(val_str: str) -> Optional[int]:
+            s = val_str.lower().replace(" ", "").replace("\xa0", "").strip()
+            multiplier = 1
+            if "тыс" in s or "k" in s or "к" in s:
+                multiplier = 1000
+                s = re.sub(r"[^\d.,]", "", s)
+            else:
+                s = re.sub(r"[^\d]", "", s)
+            if not s:
+                return None
+            try:
+                num = int(float(s.replace(",", ".")) * multiplier)
+                return num
+            except (ValueError, TypeError):
+                return None
+
+        # Шаблон числа с возможным суффиксом "тыс"/"к"/"k" или полной суммой
+        N_PAT = r"(\d{1,3}\s*(?:тыс|к|k)|\d[\d\s\xa0]{4,8}|\d{2,7})"
+
+        def _clean_bounds(s_min: int, s_max: int) -> Tuple[int, int]:
+            s_min, s_max = min(s_min, s_max), max(s_min, s_max)
+            s_min = max(30000, (s_min // 5000) * 5000)
+            s_max = max(s_min, (s_max // 5000) * 5000)
+            if s_max / s_min > 3.5:
+                s_max = int(s_min * 3.5)
+            return s_min, s_max
+
+        # 1. Поиск вилки "от X до Y" или "X - Y"
+        range_match = re.search(
+            rf"(?i)(?:зарплата|зп|доход|ожидания|salary)?[:\s]*(?:от\s+)?{N_PAT}\s*(?:до|-|–|—)\s*{N_PAT}\s*(?:руб|рублей|р\b|₽|rub|k|к|тыс)?",
+            text,
+        )
+        if range_match:
+            v1 = _parse_val(range_match.group(1))
+            v2 = _parse_val(range_match.group(2))
+            full_chunk = range_match.group(0).lower()
+            has_k = any(w in full_chunk for w in ["тыс", "k", "к"])
+            if v1 and v2:
+                if v1 < 1000 and (v2 >= 10000 or has_k):
+                    v1 *= 1000
+                if v2 < 1000 and (v1 >= 10000 or has_k):
+                    v2 *= 1000
+                if 25000 <= v1 <= 2500000 and 25000 <= v2 <= 2500000:
+                    return _clean_bounds(v1, v2)
+
+        # 2. Поиск "от X"
+        ot_match = re.search(
+            rf"(?i)(?:зарплата|зп|доход|ожидания|salary)?[:\s]*от\s+{N_PAT}\s*(?:руб|рублей|р\b|₽|rub|k|к|тыс)?",
+            text,
+        )
+        if ot_match:
+            v = _parse_val(ot_match.group(1))
+            full_chunk = ot_match.group(0).lower()
+            if v and v < 1000 and any(w in full_chunk for w in ["тыс", "k", "к"]):
+                v *= 1000
+            if v and 25000 <= v <= 2500000:
+                s_min = max(30000, (v // 5000) * 5000)
+                s_max = int(s_min * 1.35 // 5000 * 5000)
+                return _clean_bounds(s_min, s_max)
+
+        # 3. Поиск "до Y"
+        do_match = re.search(
+            rf"(?i)(?:зарплата|зп|доход|ожидания|salary)?[:\s]*до\s+{N_PAT}\s*(?:руб|рублей|р\b|₽|rub|k|к|тыс)?",
+            text,
+        )
+        if do_match:
+            v = _parse_val(do_match.group(1))
+            full_chunk = do_match.group(0).lower()
+            if v and v < 1000 and any(w in full_chunk for w in ["тыс", "k", "к"]):
+                v *= 1000
+            if v and 25000 <= v <= 2500000:
+                s_max = (v // 5000) * 5000
+                s_min = max(30000, int(s_max * 0.75 // 5000 * 5000))
+                return _clean_bounds(s_min, s_max)
+
+        # 4. Поиск единичного упоминания суммы
+        single_match = re.search(
+            rf"(?i)(?:зарплата|зп|доход|ожидания|salary)[:\s]+{N_PAT}\s*(?:руб|рублей|р\b|₽|rub|k|к|тыс)?",
+            text,
+        )
+        if not single_match:
+            single_match = re.search(
+                rf"(?i){N_PAT}\s*(?:руб|рублей|р\b|₽|rub|k|к|тыс)",
+                text,
+            )
+        if single_match:
+            v = _parse_val(single_match.group(1))
+            full_chunk = single_match.group(0).lower()
+            if v and v < 1000 and any(w in full_chunk for w in ["тыс", "k", "к"]):
+                v *= 1000
+            if v and 25000 <= v <= 2500000:
+                s_min = max(30000, int(v * 0.85 // 5000 * 5000))
+                s_max = int(v * 1.25 // 5000 * 5000)
+                return _clean_bounds(s_min, s_max)
+
+        return None, None
+
+    @classmethod
+    def detect_specialization(cls, matched_skills: Optional[List[str]], text: Optional[str]) -> str:
+        """
+        Определяет специализацию кандидата (backend, frontend, ml_data, devops, qa, infosec)
+        по пересечению навыков с таксономией и ключевым маркерам должности.
+        """
+        scores: Dict[str, int] = {
+            "backend": 0,
+            "frontend": 0,
+            "ml_data": 0,
+            "devops": 0,
+            "qa": 0,
+            "infosec": 0,
+        }
+
+        # 1. Очки за найденные навыки из таксономии
+        lower_skills = set(s.lower() for s in (matched_skills or []))
+        for domain, d_skills in TAXONOMY_350_PLUS.items():
+            overlap = lower_skills & set(d_skills)
+            scores[domain] += len(overlap) * 2
+
+        # 2. Очки за контекстные маркеры в тексте
+        t_low = (text or "").lower() if isinstance(text, str) else ""
+        if re.search(r"(?i)\b(?:backend|бэкенд|бэкэнд|серверн\w*|fastapi|django|spring\s+boot|golang|asp\.net)\b", t_low):
+            scores["backend"] += 5
+        if re.search(r"(?i)\b(?:frontend|фронтенд|react|vue|angular|верстк\w*|html5|typescript|javascript)\b", t_low):
+            scores["frontend"] += 5
+        if re.search(r"(?i)\b(?:machine\s+learning|data\s+scientist|ml\s+engineer|nlp|pytorch|tensorflow|машинн\w*\s+обучени\w*|нейросет\w*)\b", t_low):
+            scores["ml_data"] += 5
+        if re.search(r"(?i)\b(?:devops|девопс|sre|kubernetes|k8s|ansible|terraform|ci/cd|инфраструктур\w*)\b", t_low):
+            scores["devops"] += 5
+        if re.search(r"(?i)\b(?:qa|тестировщик|тестировани\w*|quality\s+assurance|playwright|selenium|pytest)\b", t_low):
+            scores["qa"] += 5
+        if re.search(r"(?i)\b(?:infosec|инфобез|безопасност\w*|appsec|pentest|пентест|owasp|soc|siem)\b", t_low):
+            scores["infosec"] += 5
+
+        best_spec = max(scores, key=lambda k: scores[k])
+        if scores[best_spec] == 0:
+            return "backend"
+        return best_spec
+
+    @classmethod
+    def detect_grade(cls, total_experience_months: Optional[int], text: Optional[str]) -> str:
+        """
+        Определяет заявляемый грейд (junior, middle, senior, lead).
+        Сначала по явному маркеру должности, затем по совокупному опыту работы:
+        - junior (< 18 мес / < 1.5 лет)
+        - middle (18-48 мес / 1.5 - 4 года)
+        - senior (48-84 мес / 4 - 7 лет)
+        - lead (>= 84 мес / > 7 лет)
+        """
+        t_low = (text or "").lower() if isinstance(text, str) else ""
+        # 1. Поиск явного грейда в тексте
+        if re.search(r"(?i)\b(?:lead|tech\s*lead|team\s*lead|тимлид|ведущ(?:ий|ая)|архитектор|principal)\b", t_low):
+            return "lead"
+        if re.search(r"(?i)\b(?:senior|сеньор|сениор|старш(?:ий|ая))\b", t_low):
+            return "senior"
+        if re.search(r"(?i)\b(?:middle|мидд?л)\b", t_low):
+            return "middle"
+        if re.search(r"(?i)\b(?:junior|джуниор|джун|стажер|стажёр|intern)\b", t_low):
+            return "junior"
+
+        # 2. Определение по стажу
+        months = total_experience_months or 0
+        if months < 18:
+            return "junior"
+        elif months < 48:
+            return "middle"
+        elif months < 84:
+            return "senior"
+        else:
+            return "lead"
+
+    @classmethod
     def parse_resume(cls, pdf_bytes: bytes) -> Dict[str, Any]:
         """
         Полный конвейер разбора PDF-резюме:
@@ -347,12 +653,18 @@ class ResumeParser:
         3. Извлечение контактов
         4. Сопоставление с таксономией 350+ навыков
         5. Структурирование опыта и образования
+        6. Автоопределение города, специализации, грейда и зарплатных ожиданий
         """
         cls.validate_magic_bytes(pdf_bytes)
         text = cls.extract_text_from_pdf(pdf_bytes)
         contacts = cls.extract_contacts(text)
         skills = cls.match_skills(text)
         exp, edu, months = cls.parse_experience_and_education(text)
+
+        city = cls.extract_city(text)
+        spec = cls.detect_specialization(skills, text)
+        grade = cls.detect_grade(months, text)
+        sal_min, sal_max = cls.parse_salary_expectations(text)
 
         # Эвристика извлечения имени и фамилии
         first_name: Optional[str] = None
@@ -387,7 +699,11 @@ class ResumeParser:
             "detected_phone": contacts["phone"],
             "detected_telegram": contacts["telegram"],
             "detected_github": contacts["github_url"],
-            "detected_city": "Москва",
+            "detected_city": city,
+            "detected_specialization": spec,
+            "detected_grade": grade,
+            "detected_salary_min": sal_min,
+            "detected_salary_max": sal_max,
             "extracted_skills": skills,
             "detected_skills": skills,
             "work_experience": exp,

@@ -45,7 +45,7 @@ def test_grade_multipliers():
 def test_dynamic_weights_allocation():
     """Проверка динамической перенормировки весов с сохранением суммы 1.00."""
     w_fsp = calculate_weights(has_fsp=True)
-    assert w_fsp == (0.35, 0.25, 0.25, 0.15)
+    assert w_fsp == (0.40, 0.25, 0.20, 0.15)
     assert abs(sum(w_fsp) - 1.00) < 1e-5
 
     w_non_fsp = calculate_weights(has_fsp=False)

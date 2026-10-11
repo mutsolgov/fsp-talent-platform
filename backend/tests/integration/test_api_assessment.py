@@ -405,3 +405,33 @@ def test_micro_challenges_listing_and_submission(client):
     assert sub_resp.status_code == 201
     assert "submission_id" in sub_resp.json()
     assert sub_resp.json()["status"] in ["accepted", "wrong_answer"]
+
+
+def test_uncalibrated_candidate_profile_honest_defaults(client):
+    """
+    R1 & R2: Новый соискатель без анкеты и категорий возвращает:
+    - city: None
+    - work_format: None
+    - grade: 'Не определен'
+    - specialization: 'Не выбрана'
+    - category_title: 'Профиль не откалиброван'
+    - skills: []
+    - expected_salary: None, salary_min: None, salary_max: None
+    - theta: 0.0, kite_score_scaled: 0.0
+    """
+    headers = _register_and_auth(client, email="new.uncalibrated.cand@fsp-test.ru")
+    resp = client.get("/api/v1/candidate-profile/me", headers=headers)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert data["city"] is None
+    assert data["work_format"] is None
+    assert data["grade"] == "Не определен"
+    assert data["specialization"] == "Не выбрана"
+    assert data["category_title"] == "Профиль не откалиброван"
+    assert data["skills"] == []
+    assert data["expected_salary"] is None
+    assert data["salary_min"] is None
+    assert data["salary_max"] is None
+    assert data["theta"] == 0.0
+    assert data["kite_score_scaled"] == 0.0
+
