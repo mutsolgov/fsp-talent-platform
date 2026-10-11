@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { RoleSwitcherBar } from '../molecules/RoleSwitcherBar';
-import { User, Shield, Briefcase, Mail, Code, Lock } from '../icons';
+import { User, Shield, Briefcase, Mail, Code, Lock, LogOut } from '../icons';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 export interface CandidateLayoutProps {
   children: ReactNode;
@@ -13,6 +14,14 @@ export const CandidateLayout: React.FC<CandidateLayoutProps> = ({
   currentTab = 'profile',
   className = '',
 }) => {
+  const { email, clearAuth } = useAuthStore();
+
+  const handleLogout = () => {
+    clearAuth();
+    sessionStorage.clear();
+    window.location.href = '/login';
+  };
+
   const tabs = [
     { id: 'profile', label: 'Мой профиль', href: '/candidate/profile', icon: <User size={16} /> },
     { id: 'onboarding', label: 'Онбординг', href: '/candidate/onboarding', icon: <Shield size={16} /> },
@@ -38,6 +47,20 @@ export const CandidateLayout: React.FC<CandidateLayoutProps> = ({
 
           <div className="flex items-center gap-3">
             <RoleSwitcherBar />
+            {email && (
+              <span className="hidden sm:inline font-mono text-xs text-[#9B9C9E] bg-[#2D2E37] px-2.5 py-1 rounded-[6px] border border-[#3D3E42]">
+                {email}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#2D2E37] hover:bg-[#3D3E42] text-[#EDEDED] hover:text-white font-mono text-xs transition-colors cursor-pointer border border-[#3D3E42]"
+              title="Выйти из системы"
+            >
+              <LogOut size={14} className="text-[#EC1D35]" />
+              <span>Выйти</span>
+            </button>
           </div>
         </div>
 

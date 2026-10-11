@@ -580,6 +580,7 @@ async def finish_assessment_session(
         select(AssessmentSession)
         .options(
             selectinload(AssessmentSession.category).selectinload(Category.grade),
+            selectinload(AssessmentSession.category).selectinload(Category.specialization),
             selectinload(AssessmentSession.answers).selectinload(AssessmentAnswer.item_family),
         )
         .where(AssessmentSession.id == session_id)
@@ -701,7 +702,7 @@ async def finish_assessment_session(
 
     explain_text = (
         f"Оценка способностей кандидата по 3PL IRT модели составила theta={scaled_score:.1f}. "
-        f"Решение тестовой батареи KITE из 12 заданий подтверждает соответствие заявленному грейду."
+        f"Решено {int(sess.raw_score or 0)} из 12 заданий."
     )
 
     return AssessmentSessionResultResponse(
@@ -709,7 +710,11 @@ async def finish_assessment_session(
         candidate_id=sess.candidate_profile_id,
         theta_score=scaled_score,
         scaled_score=scaled_score,
+        raw_score=int(sess.raw_score or 0),
         grade_confirmed=decision.get("confirmed_grade"),
+        claimed_grade=grade_name,
+        suggested_grade=decision.get("suggested_grade"),
+        specialization=category.specialization.name if category and category.specialization else "Backend",
         verdict=AssessmentVerdictEnum(decision["verdict"]) if decision["verdict"] in AssessmentVerdictEnum._value2member_map_ else AssessmentVerdictEnum.CONFIRMED,
         boost_available=decision.get("boost_offered", False),
         retest_lower_available=decision.get("retest_lower_offered", False),
@@ -732,7 +737,10 @@ async def get_assessment_session_results(
 ) -> AssessmentSessionResultResponse:
     res = await db.execute(
         select(AssessmentSession)
-        .options(selectinload(AssessmentSession.category).selectinload(Category.grade))
+        .options(
+            selectinload(AssessmentSession.category).selectinload(Category.grade),
+            selectinload(AssessmentSession.category).selectinload(Category.specialization),
+        )
         .where(AssessmentSession.id == session_id)
     )
     sess = res.scalar_one_or_none()
@@ -742,6 +750,8 @@ async def get_assessment_session_results(
 
     grade_name = sess.category.grade.name if sess.category and sess.category.grade else "Middle"
     theta = sess.theta_score if sess.theta_score is not None else 75.0
+    raw = int(sess.raw_score or 0)
+    spec_name = sess.category.specialization.name if sess.category and sess.category.specialization else "Backend"
 
     dt_ref = ensure_utc(sess.completed_at) or ensure_utc(sess.started_at) or datetime.now(timezone.utc)
     decision = GradingEngine.evaluate_session(
@@ -754,7 +764,7 @@ async def get_assessment_session_results(
 
     explain_text = (
         f"Оценка способностей кандидата по 3PL IRT модели составила theta={theta:.1f}. "
-        f"Результаты тестовой батареи KITE подтверждают соответствие грейду {grade_name}."
+        f"Решено {raw} из 12 задач."
     )
 
     return AssessmentSessionResultResponse(
@@ -762,7 +772,11 @@ async def get_assessment_session_results(
         candidate_id=sess.candidate_profile_id,
         theta_score=theta,
         scaled_score=theta,
+        raw_score=raw,
         grade_confirmed=decision.get("confirmed_grade"),
+        claimed_grade=grade_name,
+        suggested_grade=decision.get("suggested_grade"),
+        specialization=spec_name,
         verdict=AssessmentVerdictEnum(sess.verdict) if sess.verdict in AssessmentVerdictEnum._value2member_map_ else AssessmentVerdictEnum.CONFIRMED,
         boost_available=decision.get("boost_offered", False),
         retest_lower_available=decision.get("retest_lower_offered", False),

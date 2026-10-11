@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { RoleSwitcherBar } from '../molecules/RoleSwitcherBar';
-import { Shield, FileText, Sliders } from '../icons';
+import { Shield, FileText, Sliders, LogOut } from '../icons';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 export interface AdminLayoutProps {
   children: ReactNode;
@@ -8,6 +9,14 @@ export interface AdminLayoutProps {
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, className = '' }) => {
+  const { email, clearAuth } = useAuthStore();
+
+  const handleLogout = () => {
+    clearAuth();
+    sessionStorage.clear();
+    window.location.href = '/login';
+  };
+
   return (
     <div className={`min-h-screen bg-[#1B1C21] text-[#EDEDED] flex flex-col ${className}`}>
       <header className="border-b border-[#2D2E37] bg-[#202129] px-4 sm:px-8 py-3 sticky top-0 z-40">
@@ -36,6 +45,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, className = 
               )}
             </nav>
             <RoleSwitcherBar />
+            {email && (
+              <span className="hidden sm:inline font-mono text-xs text-[#9B9C9E] bg-[#2D2E37] px-2.5 py-1 rounded-[6px] border border-[#3D3E42]">
+                {email}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#2D2E37] hover:bg-[#3D3E42] text-[#EDEDED] hover:text-white font-mono text-xs transition-colors cursor-pointer border border-[#3D3E42]"
+              title="Выйти из системы"
+            >
+              <LogOut size={14} className="text-[#EC1D35]" />
+              <span>Выйти</span>
+            </button>
           </div>
         </div>
       </header>

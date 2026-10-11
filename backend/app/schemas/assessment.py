@@ -105,7 +105,11 @@ class AssessmentSessionResultResponse(BaseSchema):
     candidate_id: int
     theta_score: float = Field(..., description="Оценка IRT theta [0.0, 100.0]")
     scaled_score: float = Field(..., description="Масштабированный балл (0..100)")
+    raw_score: Optional[int] = 0
     grade_confirmed: Optional[str] = None
+    claimed_grade: Optional[str] = None
+    suggested_grade: Optional[str] = None
+    specialization: Optional[str] = None
     verdict: AssessmentVerdictEnum
     boost_available: bool = False
     retest_lower_available: bool = False

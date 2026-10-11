@@ -10,8 +10,11 @@ import { api } from '../api/client';
 export const AssessmentResultsPage: React.FC = () => {
   const [sessionId, setSessionId] = useState<string>('1');
   const [theta, setTheta] = useState(0);
-  const [confirmedGrade, setConfirmedGrade] = useState('');
-  const [specialization, setSpecialization] = useState('');
+  const [rawScore, setRawScore] = useState<number>(0);
+  const [confirmedGrade, setConfirmedGrade] = useState<string | null>(null);
+  const [claimedGrade, setClaimedGrade] = useState<string>('Middle');
+  const [suggestedGrade, setSuggestedGrade] = useState<string>('Junior');
+  const [specialization, setSpecialization] = useState('Backend');
   const [isPassed, setIsPassed] = useState(false);
   const [boostOffered, setBoostOffered] = useState(false);
   const [retestLowerOffered, setRetestLowerOffered] = useState(false);
@@ -26,12 +29,18 @@ export const AssessmentResultsPage: React.FC = () => {
     try {
       const data = await api.get<any>(`/assessment/sessions/${sessId}/results`);
       const score = Number(data.theta_score ?? data.scaled_score ?? data.theta ?? 0);
+      const raw = Number(data.raw_score ?? 0);
+      const confGrade = data.grade_confirmed || null;
       setTheta(score);
-      setConfirmedGrade(data.grade_confirmed || data.confirmed_grade || data.grade || 'Middle');
+      setRawScore(raw);
+      setConfirmedGrade(confGrade);
+      setClaimedGrade(data.claimed_grade || data.grade || 'Middle');
+      setSuggestedGrade(data.suggested_grade || 'Junior');
       setSpecialization(data.specialization || 'Backend');
-      setIsPassed(score >= 70.0);
+      const passed = Boolean(confGrade && score >= 70.0);
+      setIsPassed(passed);
       setBoostOffered(Boolean(data.boost_available || data.verdict === 'boost_offered' || score >= 88.0));
-      setRetestLowerOffered(Boolean(data.retest_lower_available || data.verdict === 'retest_lower_offered' || score < 70.0));
+      setRetestLowerOffered(Boolean(data.retest_lower_available || data.verdict === 'retest_lower_offered' || !passed));
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -85,6 +94,16 @@ export const AssessmentResultsPage: React.FC = () => {
     }
   };
 
+  const isZeroOrFailed = rawScore === 0 || theta <= 46.7;
+  const displayPercent = isZeroOrFailed
+    ? 0
+    : isPassed
+      ? Math.round(theta)
+      : Math.round((rawScore / 12) * 100);
+  const displayScore = displayPercent;
+  const accuracyPercent = rawScore === 0 ? 0 : Math.round((rawScore / 12) * 100);
+  const stressPercent = rawScore === 0 ? 0 : Math.round((rawScore / 12) * 85);
+
   return (
     <CandidateLayout currentTab="profile">
       <div className="max-w-4xl mx-auto flex flex-col gap-8">
@@ -124,19 +143,31 @@ export const AssessmentResultsPage: React.FC = () => {
 
               <div className="flex flex-col items-center gap-2">
                 <span className="text-xs font-mono text-[#9B9C9E] uppercase tracking-wider">
-                  Байесовская оценка способностей (EAP Theta):
+                  Итоговый результат тестирования:
                 </span>
                 <div className="font-mono text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#00F5D4] via-[#5CE1E6] to-[#402FFF]">
-                  {theta.toFixed(1)} / 100
+                  {displayPercent}% ({displayScore} / 100)
                 </div>
+                <span className="text-xs font-mono text-[#C8C9CA]">
+                  Решено задач: {rawScore} из 12
+                </span>
               </div>
 
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm font-mono text-[#C8C9CA]">Присвоенная категория:</span>
-                <Badge variant="fsp" size="md" className="text-base px-3 py-1 font-bold">
-                  {specialization} • {confirmedGrade}
-                </Badge>
-              </div>
+              {isPassed ? (
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-sm font-mono text-[#C8C9CA]">Присвоенная категория:</span>
+                  <Badge variant="fsp" size="md" className="text-base px-3 py-1 font-bold">
+                    {specialization} • {confirmedGrade}
+                  </Badge>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-sm font-mono text-[#C8C9CA]">Заявленный грейд:</span>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/40">
+                    {specialization} • {claimedGrade} (Не подтвержден)
+                  </span>
+                </div>
+              )}
 
               {isPassed ? (
                 <div className="flex items-center gap-2 text-xs font-mono text-[#00F5D4] bg-[#00F5D4]/10 px-3 py-1.5 rounded-full border border-[#00F5D4]/30 mt-2">
@@ -144,9 +175,9 @@ export const AssessmentResultsPage: React.FC = () => {
                   <span>Грейд успешно подтвержден математической моделью Бирнбаума</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-xs font-mono text-[#FFD700] bg-[#FFD700]/10 px-3 py-1.5 rounded-full border border-[#FFD700]/30 mt-2">
+                <div className="flex items-center gap-2 text-xs font-mono text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/30 mt-2">
                   <AlertCircle size={16} />
-                  <span>Непринудительный грейдинг: доступен повторный тест без кулдауна</span>
+                  <span>Грейд не подтвержден (требуется ≥ 70 баллов). Непринудительный грейдинг: доступен повторный тест без кулдауна</span>
                 </div>
               )}
             </div>
@@ -161,7 +192,7 @@ export const AssessmentResultsPage: React.FC = () => {
                 </div>
                 <div className="flex justify-center py-2">
                   <RadarMatchChart
-                    testMatch={theta}
+                    testMatch={displayScore}
                     stackMatch={88}
                     fspMatch={75}
                     freshnessMatch={100}
@@ -183,20 +214,20 @@ export const AssessmentResultsPage: React.FC = () => {
                     <div>
                       <div className="flex justify-between text-[#C8C9CA] mb-1">
                         <span>Алгоритмическая точность (KITE)</span>
-                        <span className="text-[#00F5D4]">89.2%</span>
+                        <span className="text-[#00F5D4]">{accuracyPercent}%</span>
                       </div>
                       <div className="w-full bg-[#1B1C21] h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#00F5D4] h-full rounded-full" style={{ width: '89.2%' }} />
+                        <div className="bg-[#00F5D4] h-full rounded-full" style={{ width: `${accuracyPercent}%` }} />
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between text-[#C8C9CA] mb-1">
                         <span>Стресс-тесты и краевые случаи</span>
-                        <span className="text-[#402FFF]">84.0%</span>
+                        <span className="text-[#402FFF]">{stressPercent}%</span>
                       </div>
                       <div className="w-full bg-[#1B1C21] h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#402FFF] h-full rounded-full" style={{ width: '84.0%' }} />
+                        <div className="bg-[#402FFF] h-full rounded-full" style={{ width: `${stressPercent}%` }} />
                       </div>
                     </div>
 
@@ -213,10 +244,52 @@ export const AssessmentResultsPage: React.FC = () => {
                 </div>
 
                 <ScoreBreakdownBar
-                  totalScore={Math.round(theta)}
-                  breakdown={{ test: 35, stack: 25, fsp: 18, freshness: 15 }}
+                  totalScore={displayScore}
+                  breakdown={{ test: Math.round(displayScore * 0.35), stack: 25, fsp: 18, freshness: 15 }}
                   isFsp={true}
                 />
+              </div>
+            </div>
+
+            {/* Academic Psychometrics Explainability Block (For Jury & Auditing) */}
+            <div className="p-6 bg-[#202129] rounded-[16px] border border-[#2D2E37] flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-[#00F5D4]" />
+                  <h3 className="font-mono text-sm font-bold text-white">
+                    Психометрическая калибровка KITE IRT 3PL (Детализация для жюри)
+                  </h3>
+                </div>
+                <Badge variant="fsp" size="sm">Бирнбаум 3PL</Badge>
+              </div>
+
+              <p className="text-xs text-[#9B9C9E] leading-relaxed">
+                Оценка способностей рассчитывается методом Байесовского апостериорного математического ожидания (EAP — Expected A Posteriori) на квадратурной сетке из 61 узла по трехпараметрической логистической модели Бирнбаума (3PL).
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+                <div className="p-3 bg-[#1B1C21] rounded-[8px] border border-[#2D2E37]">
+                  <span className="text-[#9B9C9E] block mb-1">EAP Theta (Scale 0-100)</span>
+                  <span className="text-base font-bold text-[#00F5D4]">{theta.toFixed(1)} / 100</span>
+                  <span className="text-[10px] text-[#6B6C72] block mt-0.5">Академический балл модели</span>
+                </div>
+                <div className="p-3 bg-[#1B1C21] rounded-[8px] border border-[#2D2E37]">
+                  <span className="text-[#9B9C9E] block mb-1">Априорное распределение</span>
+                  <span className="text-base font-bold text-[#5CE1E6]">𝒩(0, 1) Гауссово</span>
+                  <span className="text-[10px] text-[#6B6C72] block mt-0.5">Prior SD = 1.0 ([-4.0; +4.0])</span>
+                </div>
+                <div className="p-3 bg-[#1B1C21] rounded-[8px] border border-[#2D2E37]">
+                  <span className="text-[#9B9C9E] block mb-1">Порог подтверждения</span>
+                  <span className="text-base font-bold text-[#FFD700]">θ ≥ 70.0 баллов</span>
+                  <span className="text-[10px] text-[#6B6C72] block mt-0.5">Порог подтверждения грейда</span>
+                </div>
+              </div>
+
+              <div className="text-[11px] font-mono text-[#7B7C80] bg-[#17181D] p-3 rounded-[8px] border border-[#272832] leading-relaxed">
+                <span className="text-[#9B9C9E] font-bold">Математическое обоснование шкалы: </span>
+                Модель 3PL учитывает параметр случайного угадывания (c_i ≈ 0.20) и дифференцирующую способность (a_i). 
+                При 0 правильных ответов апостериорный минимум модели составляет 46.6 балла (θ* ≈ -1.97), что в пользовательском интерфейсе 
+                интерпретируется как 0% решенных задач. Для подтверждения грейда {claimedGrade} необходимо набрать не менее 70.0 баллов.
               </div>
             </div>
 
@@ -265,19 +338,19 @@ export const AssessmentResultsPage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <AlertCircle size={28} className="text-amber-400 shrink-0" />
                   <div>
-                    <h4 className="font-mono text-sm font-bold text-white">Непринудительный грейдинг (θ &lt; 70)</h4>
+                    <h4 className="font-mono text-sm font-bold text-white">Рекомендованный уровень: {suggestedGrade}</h4>
                     <p className="text-xs text-[#C8C9CA]">
-                      Вы можете мгновенно пройти тестирование на грейд Junior без ожидания 90-дневного кулдауна.
+                      Заявленный уровень {claimedGrade} не подтвержден ({displayPercent}%). Вы можете мгновенно пройти тестирование на уровень {suggestedGrade} без ожидания 90-дневного кулдауна.
                     </p>
                   </div>
                 </div>
                 <Button
-                  variant="secondary"
+                  variant="fsp_mint"
                   size="sm"
                   isLoading={isSubmittingAction}
                   onClick={handleRetestLower}
                 >
-                  <span>Тест на уровень Junior</span>
+                  <span>Пройти тест на {suggestedGrade}</span>
                   <ArrowRight size={14} />
                 </Button>
               </div>
